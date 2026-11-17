@@ -1,0 +1,85 @@
+[
+  {
+    "id": "q-array-1",
+    "concept": "array",
+    "type": "choice",
+    "prompt": "아래 코드에서 a[3]의 값은?",
+    "code": "int a[5] = {1, 2, 3};",
+    "choices": [
+      "0",
+      "3",
+      "쓰레기 값",
+      "컴파일 에러"
+    ],
+    "answer": 0
+  },
+  {
+    "id": "q-array-2",
+    "concept": "array",
+    "type": "choice",
+    "prompt": "아래 코드에서 sizeof(a) / sizeof(a[0])의 값은?",
+    "code": "int a[4];",
+    "choices": [
+      "1",
+      "4",
+      "16",
+      "int 크기에 따라 다르다"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "q-pointer-1",
+    "concept": "pointer",
+    "type": "choice",
+    "prompt": "아래 코드를 실행한 뒤 a의 값은?",
+    "code": "int a = 3;\nint *p = &a;\n*p = 5;",
+    "choices": [
+      "3",
+      "5",
+      "a의 주소값",
+      "컴파일 에러"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "q-pointer-2",
+    "concept": "pointer",
+    "type": "choice",
+    "prompt": "아래 코드를 실행한 뒤 *p의 값은?",
+    "code": "int a[3] = {10, 20, 30};\nint *p = a;\np++;",
+    "choices": [
+      "10",
+      "20",
+      "30",
+      "a의 주소 + 1"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "q-linked_list-1",
+    "concept": "linked_list",
+    "type": "choice",
+    "prompt": "단일 연결 리스트의 맨 앞(head 앞)에 새 노드를 삽입하는 연산의 시간 복잡도는?",
+    "choices": [
+      "O(1)",
+      "O(log n)",
+      "O(n)",
+      "O(n log n)"
+    ],
+    "answer": 0
+  },
+  {
+    "id": "q-linked_list-2",
+    "concept": "linked_list",
+    "type": "choice",
+    "prompt": "아래 구조체로 만든 단일 연결 리스트에서 마지막 노드의 next에 들어가는 값은?",
+    "code": "struct Node {\n    int data;\n    struct Node *next;\n};",
+    "choices": [
+      "NULL",
+      "자기 자신의 주소",
+      "head의 주소",
+      "0이 아닌 아무 값"
+    ],
+    "answer": 0
+  }
+]

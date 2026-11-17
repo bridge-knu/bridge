@@ -1,0 +1,30 @@
+[
+  {
+    "id": "array",
+    "name": "배열",
+    "course": "C",
+    "prereqs": [],
+    "stability": 24,
+    "blocks": 1
+  },
+  {
+    "id": "pointer",
+    "name": "포인터",
+    "course": "C",
+    "prereqs": [
+      "array"
+    ],
+    "stability": 12,
+    "blocks": 2
+  },
+  {
+    "id": "linked_list",
+    "name": "연결 리스트",
+    "course": "DS",
+    "prereqs": [
+      "pointer"
+    ],
+    "stability": 12,
+    "blocks": 2
+  }
+]
