@@ -1,0 +1,50 @@
+[
+  {
+    "id": "b-array-1",
+    "concept": "array",
+    "minutes": 30,
+    "video": "https://www.youtube.com/watch?v=REPLACE_ME",
+    "videoStart": 0,
+    "videoEnd": 600,
+    "practice": {
+      "lang": "c",
+      "starter": "#include <stdio.h>\n\nint main(void) {\n    int a[5] = {1, 2, 3, 4, 5};\n    int sum = 0;\n\n    /* 반복문으로 a의 모든 원소를 더해 sum에 저장하세요 */\n\n    printf(\"%d\\n\", sum);\n    return 0;\n}\n",
+      "expected": "15\n"
+    },
+    "check": [
+      "q-array-2"
+    ]
+  },
+  {
+    "id": "b-pointer-1",
+    "concept": "pointer",
+    "minutes": 30,
+    "video": "https://www.youtube.com/watch?v=REPLACE_ME",
+    "videoStart": 0,
+    "videoEnd": 720,
+    "practice": {
+      "lang": "c",
+      "starter": "#include <stdio.h>\n\nint main(void) {\n    int a = 3;\n    int *p = &a;\n\n    /* a를 직접 쓰지 말고, p를 이용해 a의 값을 5로 바꾸세요 */\n\n    printf(\"%d\\n\", a);\n    return 0;\n}\n",
+      "expected": "5\n"
+    },
+    "check": [
+      "q-pointer-2"
+    ]
+  },
+  {
+    "id": "b-linked_list-1",
+    "concept": "linked_list",
+    "minutes": 30,
+    "video": "https://www.youtube.com/watch?v=REPLACE_ME",
+    "videoStart": 0,
+    "videoEnd": 900,
+    "practice": {
+      "lang": "c",
+      "starter": "#include <stdio.h>\n\nstruct Node {\n    int data;\n    struct Node *next;\n};\n\nint main(void) {\n    struct Node n3 = {3, NULL};\n    struct Node n2 = {2, &n3};\n    struct Node n1 = {1, &n2};\n    struct Node *head = &n1;\n\n    /* head부터 next를 따라가며 data를 \"1 2 3\" 형태로 출력하세요 */\n\n    printf(\"\\n\");\n    return 0;\n}\n",
+      "expected": "1 2 3\n"
+    },
+    "check": [
+      "q-linked_list-2"
+    ]
+  }
+]
