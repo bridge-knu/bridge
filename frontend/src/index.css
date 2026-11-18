@@ -167,3 +167,47 @@ a {
   margin: 0;
   color: #b91c1c;
 }
+
+.diagnosis-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.diagnosis-progress progress {
+  flex: 1;
+  accent-color: #2563eb;
+}
+
+.diagnosis-prompt {
+  font-size: 1.25rem;
+}
+
+.diagnosis-code {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  background-color: #1f2937;
+  color: #f9fafb;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.form .diagnosis-choices label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.form .diagnosis-choices label.selected {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
