@@ -69,6 +69,7 @@ export default function LoginPage() {
             name="loginId"
             autoComplete="username"
             autoFocus
+            maxLength={30}
             value={loginId}
             onChange={(e) => setLoginId(e.target.value)}
             disabled={loading}
