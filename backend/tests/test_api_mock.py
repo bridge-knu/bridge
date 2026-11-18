@@ -56,7 +56,7 @@ def test_login_pin_must_be_4_digits(client, pin):
 # ---- 프로필 ----
 
 PROFILE = {
-    "completedCourses": [{"course": "C프로그래밍", "grade": "B+"}],
+    "completedCourses": [{"course": "C", "grade": "A+"}],
     "gapMonths": 24,
     "targetCourse": "DS",
     "returnDate": "2027-03-02",
@@ -69,13 +69,30 @@ def test_save_profile(client):
     assert r.status_code == 200
     body = r.json()
     assert body["gapMonths"] == 24
-    assert body["completedCourses"] == [{"course": "C프로그래밍", "grade": "B+"}]
+    assert body["completedCourses"] == [{"course": "C", "grade": "A+"}]
     assert "updatedAt" in body
 
 
-def test_profile_rejects_bad_minutes(client):
-    r = client.put("/profile", json={**PROFILE, "dailyMinutes": 10})
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"dailyMinutes": 10},
+        {"dailyMinutes": 601},
+        {"gapMonths": -1},
+        {"gapMonths": 121},
+        {"targetCourse": "자료구조"},
+        {"completedCourses": [{"course": "C프로그래밍", "grade": "B+"}]},
+    ],
+)
+def test_profile_rejects_invalid_values(client, change):
+    r = client.put("/profile", json={**PROFILE, **change})
     assert r.status_code == 422
+
+
+def test_profile_keeps_raw_grade(client):
+    courses = [{"course": "C", "grade": "A+"}, {"course": "DS", "grade": "P"}]
+    r = client.put("/profile", json={**PROFILE, "completedCourses": courses})
+    assert r.json()["completedCourses"] == courses
 
 
 # ---- 진단 ----
