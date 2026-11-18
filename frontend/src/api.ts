@@ -95,8 +95,29 @@ export function login(loginId: string, pin: string) {
   return request<LoginResponse>('POST', '/auth/login', body)
 }
 
+// 성적표의 원래 성적. 정규화(A/B/C, 미이수)는 백엔드가 한다.
+export const GRADES = [
+  'A+', 'A0', 'A-',
+  'B+', 'B0', 'B-',
+  'C+', 'C0', 'C-',
+  'D+', 'D0', 'D-',
+  'F', 'P',
+] as const
+
+export type Grade = (typeof GRADES)[number]
+
+export interface Profile {
+  /** 과목 id → 원래 성적. 미수강 과목은 키를 넣지 않는다. */
+  completedCourses: Record<string, Grade>
+  gapMonths: number
+  targetCourse: string
+  /** YYYY-MM-DD */
+  returnDate: string
+  dailyMinutes: number
+}
+
 /** PUT /profile: 이수 과목·공백·복학일·하루 시간 저장 */
-export function saveProfile(profile: unknown) {
+export function saveProfile(profile: Profile) {
   return request<unknown>('PUT', '/profile', profile)
 }
 
