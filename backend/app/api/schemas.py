@@ -37,15 +37,21 @@ class LoginResponse(CamelModel):
 # ---- 프로필 ----
 
 
+# 과목 코드. content/concepts.json의 course와 같다 (C: C프로그래밍, DS: 자료구조).
+CourseCode = Literal["C", "DS"]
+
+
 class CompletedCourse(CamelModel):
-    course: str = Field(examples=["C프로그래밍"])
-    grade: str | None = Field(default=None, examples=["B+"])
+    """성적은 받은 그대로 저장한다 (A+, B0, P 등). 정규화는 엔진이 한다."""
+
+    course: CourseCode = Field(examples=["C"])
+    grade: str | None = Field(default=None, examples=["A+"])
 
 
 class Profile(CamelModel):
     completed_courses: list[CompletedCourse] = Field(default_factory=list)
     gap_months: int = Field(ge=0, le=120, examples=[24])
-    target_course: str = Field(examples=["DS"])
+    target_course: CourseCode = Field(examples=["DS"])
     return_date: date = Field(examples=["2027-03-02"])
     daily_minutes: int = Field(ge=30, le=600, examples=[120])
 
