@@ -3,7 +3,8 @@
 // 여기 경로에도 /api를 넣지 않는다. 접두어는 API_BASE가 붙이고, 개발 서버 프록시와
 // 배포 Caddy가 떼어서 백엔드로 넘긴다 (/api/auth/login → /auth/login).
 // JSON 요청·응답 필드는 모두 camelCase다.
-// 요청·응답 타입은 mock API(A3)의 스키마가 확정되면 맞춰서 구체화한다.
+// 요청·응답 타입은 mock API(A3, PR #28)의 backend/app/api/schemas.py를 따른다.
+// 아직 unknown인 함수는 해당 화면을 만들 때 구체화한다.
 
 const API_BASE: string = import.meta.env.VITE_API_BASE || '/api'
 
@@ -106,19 +107,37 @@ export const GRADES = [
 
 export type Grade = (typeof GRADES)[number]
 
+/** 과목 코드. content/concepts.json의 course와 같다 (C: C 프로그래밍, DS: 자료구조). */
+export type CourseCode = 'C' | 'DS'
+
+export interface CompletedCourse {
+  course: CourseCode
+  /** 성적표의 원래 성적 */
+  grade: Grade
+}
+
 export interface Profile {
-  /** 과목 id → 원래 성적. 미수강 과목은 키를 넣지 않는다. */
-  completedCourses: Record<string, Grade>
+  /** 이수한 과목과 성적. 미수강 과목은 넣지 않는다. */
+  completedCourses: CompletedCourse[]
+  /** 0~120 */
   gapMonths: number
-  targetCourse: string
+  targetCourse: CourseCode
   /** YYYY-MM-DD */
   returnDate: string
+  /** 30~600 */
   dailyMinutes: number
 }
 
-/** PUT /profile: 이수 과목·공백·복학일·하루 시간 저장 */
+export interface ProfileResponse extends Profile {
+  updatedAt: string
+}
+
+/**
+ * PUT /profile: 이수 과목·공백·복학일·하루 시간 저장
+ * 실패: 422 입력 검증 오류 (detail은 배열) → ApiError(status, detail=null)
+ */
 export function saveProfile(profile: Profile) {
-  return request<unknown>('PUT', '/profile', profile)
+  return request<ProfileResponse>('PUT', '/profile', profile)
 }
 
 // ---- 진단 ----

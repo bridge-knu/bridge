@@ -1,12 +1,26 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, GRADES, saveProfile, setAuthToken, type Grade, type Profile } from '../api.ts'
+import {
+  ApiError,
+  GRADES,
+  saveProfile,
+  setAuthToken,
+  type CompletedCourse,
+  type CourseCode,
+  type Grade,
+  type Profile,
+} from '../api.ts'
 
 // 과목 id는 content/concepts.json의 course 값과 같다.
-const COURSES = [
+const COURSES: { id: CourseCode; name: string }[] = [
   { id: 'C', name: 'C 프로그래밍' },
   { id: 'DS', name: '자료구조' },
 ]
+
+// 백엔드 Profile 스키마(PR #28)의 범위와 같다. 벗어나면 422가 난다.
+const GAP_MONTHS_MAX = 120
+const DAILY_MINUTES_MIN = 30
+const DAILY_MINUTES_MAX = 600
 
 // 드롭다운의 "미수강" 값. 이 값인 과목은 completedCourses에서 뺀다.
 const NOT_TAKEN = ''
@@ -32,10 +46,11 @@ interface FormValues {
 // 문제가 없으면 Profile, 있으면 안내 문구를 돌려준다.
 function toProfile(v: FormValues): Profile | string {
   const gapMonths = Number(v.gapMonths)
-  if (v.gapMonths.trim() === '' || !Number.isInteger(gapMonths) || gapMonths < 0) {
-    return '공백 기간은 0 이상의 정수(개월)로 입력해 주세요'
+  if (v.gapMonths.trim() === '' || !Number.isInteger(gapMonths) || gapMonths < 0 || gapMonths > GAP_MONTHS_MAX) {
+    return `공백 기간은 0 이상 ${GAP_MONTHS_MAX} 이하의 정수(개월)로 입력해 주세요`
   }
-  if (!COURSES.some((c) => c.id === v.targetCourse)) {
+  const targetCourse = COURSES.find((c) => c.id === v.targetCourse)?.id
+  if (!targetCourse) {
     return '목표 과목을 선택해 주세요'
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v.returnDate)) {
@@ -45,17 +60,23 @@ function toProfile(v: FormValues): Profile | string {
     return '복학 예정일은 내일 이후 날짜로 선택해 주세요'
   }
   const dailyMinutes = Number(v.dailyMinutes)
-  if (v.dailyMinutes.trim() === '' || !Number.isInteger(dailyMinutes) || dailyMinutes < 30 || dailyMinutes > 1440) {
-    return '하루 학습 시간은 30분 이상 1440분 이하의 정수로 입력해 주세요'
+  if (
+    v.dailyMinutes.trim() === '' ||
+    !Number.isInteger(dailyMinutes) ||
+    dailyMinutes < DAILY_MINUTES_MIN ||
+    dailyMinutes > DAILY_MINUTES_MAX
+  ) {
+    return `하루 학습 시간은 ${DAILY_MINUTES_MIN}분 이상 ${DAILY_MINUTES_MAX}분 이하의 정수로 입력해 주세요`
   }
 
   // 선택한 성적을 그대로 보낸다 (변환하지 않음). 미수강만 뺀다.
-  const completedCourses: Record<string, Grade> = {}
-  for (const [courseId, grade] of Object.entries(v.grades)) {
-    if (grade !== NOT_TAKEN) completedCourses[courseId] = grade
+  const completedCourses: CompletedCourse[] = []
+  for (const course of COURSES) {
+    const grade = v.grades[course.id]
+    if (grade !== NOT_TAKEN) completedCourses.push({ course: course.id, grade })
   }
 
-  return { completedCourses, gapMonths, targetCourse: v.targetCourse, returnDate: v.returnDate, dailyMinutes }
+  return { completedCourses, gapMonths, targetCourse, returnDate: v.returnDate, dailyMinutes }
 }
 
 function errorMessage(err: unknown): string {
@@ -145,6 +166,7 @@ export default function ProfilePage() {
             type="number"
             inputMode="numeric"
             min={0}
+            max={GAP_MONTHS_MAX}
             step={1}
             value={values.gapMonths}
             onChange={(e) => update('gapMonths', e.target.value)}
@@ -184,8 +206,8 @@ export default function ProfilePage() {
           <input
             type="number"
             inputMode="numeric"
-            min={30}
-            max={1440}
+            min={DAILY_MINUTES_MIN}
+            max={DAILY_MINUTES_MAX}
             step={30}
             value={values.dailyMinutes}
             onChange={(e) => update('dailyMinutes', e.target.value)}
