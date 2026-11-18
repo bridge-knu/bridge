@@ -76,6 +76,19 @@ DB와 엔진이 연결되기 전까지 가짜 데이터를 돌려줍니다. 저�
 
 코드 실행은 1초 동안 `running`이었다가 `done`이 됩니다.
 
+## DB
+
+테이블은 `backend/app/models/`에 있고, backend 컨테이너가 시작할 때 마이그레이션(`alembic upgrade head`)이 자동으로 적용됩니다.
+
+모델을 바꿨다면 마이그레이션 파일을 만들어서 같이 커밋하세요.
+
+```bash
+docker compose exec backend alembic revision --autogenerate -m "변경 내용"
+docker compose exec backend alembic upgrade head
+```
+
+DB를 처음 상태로 되돌리려면 `docker compose down -v` 후 다시 `docker compose up -d` 하세요.
+
 ## 테스트
 
 ```bash
@@ -83,5 +96,7 @@ cd backend
 pip install -r requirements-dev.txt
 pytest
 ```
+
+DB 테스트는 `docker compose up -d`로 postgres가 떠 있을 때만 실행되고, 없으면 건너뜁니다. 테스트 데이터는 끝나면 되돌려서 DB에 남지 않습니다.
 
 개발 규칙은 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)를 참고하세요.
