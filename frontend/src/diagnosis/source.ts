@@ -1,19 +1,26 @@
 // 진단 문제를 가져오는 곳. 화면(DiagnosisPage)은 DiagnosisSource만 알고,
 // 문제가 어디서 오는지는 모른다.
 //
-// 지금은 진단 API 규격이 확정되지 않아 content/questions.json을 순서대로 내는
-// 로컬 소스를 쓴다. API가 확정되면 api.ts의 startDiagnosis/answerDiagnosis를 부르는
-// 소스를 만들어 아래 diagnosisSource만 바꾸면 된다.
-// 아래 타입은 화면 내부용이며 API 규격이 아니다.
+// 백엔드 진단 API(POST /diagnosis/start, /diagnosis/answer)를 부르고,
+// 응답(api.ts의 DiagnosisStep)을 아래의 화면용 형태로 바꿔서 돌려준다.
+// 채점과 다음 문제 선택은 백엔드가 한다. 정답 여부(correct)는 화면에 넘기지 않는다.
+// 아래 타입은 화면 내부용이며 API 규격이 아니다. API 규격은 api.ts에 있다.
 
-import rawQuestions from '../../../content/questions.json'
+import {
+  answerDiagnosis,
+  startDiagnosis,
+  type DiagnosisStep as ApiDiagnosisStep,
+  type QuestionOut,
+} from '../api.ts'
 
-/** 화면에 보여줄 문제. questions.json의 필드에서 정답(answer)을 뺀 것. */
+/** 화면에 보여줄 문제 */
 export interface DiagnosisQuestion {
   id: string
+  /** 개념 id (API의 conceptId) */
   concept: string
   type: 'choice'
   prompt: string
+  /** 코드 문제일 때만 있다 */
   code?: string
   choices: string[]
 }
@@ -33,20 +40,10 @@ export interface DiagnosisSource {
   answer(questionId: string, choice: number): Promise<DiagnosisStep>
 }
 
-interface RawQuestion {
-  id: string
-  concept: string
-  type?: string
-  prompt: string
-  code?: string | null
-  choices: string[]
-}
-
-// 정답은 복사하지 않는다. 화면 코드가 정답을 볼 수 없게 하기 위함.
-function toQuestion(q: RawQuestion): DiagnosisQuestion {
+function toQuestion(q: QuestionOut): DiagnosisQuestion {
   return {
     id: q.id,
-    concept: q.concept,
+    concept: q.conceptId,
     type: 'choice',
     prompt: q.prompt,
     ...(q.code ? { code: q.code } : {}),
@@ -54,32 +51,25 @@ function toQuestion(q: RawQuestion): DiagnosisQuestion {
   }
 }
 
-// questions.json의 문제를 처음부터 순서대로 낸다. 채점·적응형 진행은 하지 않는다
-// (그건 백엔드 엔진의 일이다). 답은 메모리에만 기록한다.
-export function createLocalSource(raw: RawQuestion[]): DiagnosisSource {
-  const questions = raw.map(toQuestion)
-  let index = 0
-  const answers: { questionId: string; choice: number }[] = []
+// answeredCount는 지금 문제 전까지 답한 수라서, 지금 문제 번호는 +1이다.
+export function toStep(res: ApiDiagnosisStep): DiagnosisStep {
+  const question = res.done || !res.question ? null : toQuestion(res.question)
+  return {
+    question,
+    number: question ? Math.min(res.answeredCount + 1, res.maxQuestions) : res.answeredCount,
+    total: res.maxQuestions,
+  }
+}
 
-  const step = (): DiagnosisStep => ({
-    question: questions[index] ?? null,
-    number: Math.min(index + 1, questions.length),
-    total: questions.length,
-  })
-
+export function createApiSource(): DiagnosisSource {
   return {
     async start() {
-      index = 0
-      answers.length = 0
-      return step()
+      return toStep(await startDiagnosis())
     },
     async answer(questionId, choice) {
-      if (questions[index]?.id !== questionId) throw new Error('지금 문제가 아닌 답이 들어왔어요')
-      answers.push({ questionId, choice })
-      index += 1
-      return step()
+      return toStep(await answerDiagnosis(questionId, choice))
     },
   }
 }
 
-export const diagnosisSource: DiagnosisSource = createLocalSource(rawQuestions as RawQuestion[])
+export const diagnosisSource: DiagnosisSource = createApiSource()

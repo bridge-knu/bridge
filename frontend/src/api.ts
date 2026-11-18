@@ -142,19 +142,66 @@ export function saveProfile(profile: Profile) {
 
 // ---- 진단 ----
 
-/** POST /diagnosis/start: 시작점 계산 후 첫 문제 반환 */
-export function startDiagnosis() {
-  return request<unknown>('POST', '/diagnosis/start')
+/** 화면에 보여줄 문제. 정답은 내려오지 않는다. */
+export interface QuestionOut {
+  id: string
+  conceptId: string
+  conceptName: string
+  prompt: string
+  /** 코드 문제일 때 하이라이트할 코드. 없으면 null */
+  code: string | null
+  choices: string[]
 }
 
-/** POST /diagnosis/answer: 답 제출 → 다음 문제 또는 종료 */
-export function answerDiagnosis(answer: unknown) {
-  return request<unknown>('POST', '/diagnosis/answer', answer)
+export interface DiagnosisAnswerRequest {
+  questionId: string
+  /** choices의 0부터 시작하는 인덱스 */
+  choice: number
+}
+
+/** 진단 시작·답 제출 응답. done이 true이면 question은 null. */
+export interface DiagnosisStep {
+  done: boolean
+  /** 방금 낸 답의 정답 여부 (start에서는 null) */
+  correct: boolean | null
+  question: QuestionOut | null
+  /** 지금까지 답한 문제 수 (지금 문제는 포함하지 않음) */
+  answeredCount: number
+  maxQuestions: number
+}
+
+export interface ConceptResult {
+  id: string
+  name: string
+  course: string
+  prereqs: string[]
+  /** 0~1. 그래프 색깔에 사용 */
+  mastery: number
+  /** prior: 망각 추정값, diagnosed: 진단 문제로 확인한 값 */
+  source: 'prior' | 'diagnosed'
+}
+
+export interface DiagnosisResult {
+  concepts: ConceptResult[]
+}
+
+/** POST /diagnosis/start: 시작점 계산 후 첫 문제 반환 */
+export function startDiagnosis() {
+  return request<DiagnosisStep>('POST', '/diagnosis/start')
+}
+
+/**
+ * POST /diagnosis/answer: 답 제출 → 다음 문제 또는 종료
+ * 실패: 400 이미 끝난 진단이거나 지금 문제가 아닌 답 → ApiError(status, detail)
+ */
+export function answerDiagnosis(questionId: string, choice: number) {
+  const body: DiagnosisAnswerRequest = { questionId, choice }
+  return request<DiagnosisStep>('POST', '/diagnosis/answer', body)
 }
 
 /** GET /diagnosis/result: 개념별 mastery (그래프용) */
 export function getDiagnosisResult() {
-  return request<unknown>('GET', '/diagnosis/result')
+  return request<DiagnosisResult>('GET', '/diagnosis/result')
 }
 
 // ---- 플랜 ----
