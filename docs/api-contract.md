@@ -121,7 +121,109 @@ A+ A0 A- B+ B0 B- C+ C0 C- D+ D0 D- F P
 | P | B | 0.75 |
 | D+, D0, D-, F | 미이수 | 0.1 |
 
-## 진단 API (C3 PR에서 기록)
+## 진단 API
 
-`POST /diagnosis/start`, `POST /diagnosis/answer`, `GET /diagnosis/result`의 필드 형식은 PR #28에서 정해졌고,
-진단 화면(C3, #18) PR에서 이 문서에 기록한다. 정답(`answer`)은 클라이언트로 보내지 않는다.
+규격은 PR #28(`f3d10bf`)의 `backend/app/api/schemas.py`, `diagnosis.py`를 따른다.
+채점과 다음 문제 선택은 백엔드가 하고, 정답(`answer`)은 클라이언트로 보내지 않는다.
+
+### 공통 객체
+
+`QuestionOut` (화면에 보여줄 문제):
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | string | 문제 id |
+| `conceptId` | string | 개념 id |
+| `conceptName` | string | 개념 이름 |
+| `prompt` | string | 문제 문장 |
+| `code` | string \| null | 코드 문제일 때 보여줄 코드 |
+| `choices` | string[] | 보기 |
+
+`DiagnosisStep` (start·answer 응답):
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `done` | boolean | 진단 종료 여부 |
+| `correct` | boolean \| null | 방금 낸 답의 정답 여부 (start에서는 null) |
+| `question` | QuestionOut \| null | 다음 문제. `done`이 true이면 null |
+| `answeredCount` | number | 지금까지 답한 문제 수 (지금 문제는 포함하지 않음) |
+| `maxQuestions` | number | 최대 문제 수 |
+
+> **[확인 필요: 상민·준혁]** mock은 `maxQuestions`가 3이고 개발 가이드는 5~10문제다. 실제 값을 엔진이 정하는지 확인해 주세요.
+
+### POST /diagnosis/start
+
+요청 본문 없음. 진단을 처음부터 시작하고 첫 문제를 돌려준다 (진행 중이던 진단은 초기화된다).
+
+> **[확인 필요: 상민]** 진행 중인 진단이 있을 때 start가 초기화하는 동작을 실제 구현에서도 유지할지 확인해 주세요.
+> 프론트의 "진단 다시 시작" 버튼이 이 동작에 의존한다.
+
+성공 (200): `DiagnosisStep`
+
+```json
+{
+  "done": false,
+  "correct": null,
+  "question": {
+    "id": "q-array-1",
+    "conceptId": "array",
+    "conceptName": "배열",
+    "prompt": "아래 코드에서 a[3]의 값은?",
+    "code": "int a[5] = {1, 2, 3};",
+    "choices": ["0", "3", "쓰레기 값", "컴파일 에러"]
+  },
+  "answeredCount": 0,
+  "maxQuestions": 3
+}
+```
+
+### POST /diagnosis/answer
+
+요청:
+
+```json
+{ "questionId": "q-array-1", "choice": 0 }
+```
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `questionId` | string | 지금 풀고 있는 문제 id |
+| `choice` | number | `choices`의 0부터 시작하는 인덱스 (0 이상) |
+
+성공 (200): `DiagnosisStep`. 마지막 문제에 답하면 `done: true`, `question: null`.
+
+실패:
+
+| 상태 | 본문 | 프론트 처리 |
+| --- | --- | --- |
+| 400 | `{ "detail": "지금 풀고 있는 문제가 아니에요" }` | 안내 + "진단 다시 시작" 버튼 |
+| 400 | `{ "detail": "진단이 이미 끝났어요" }` | 완료 화면으로 이동 (결과 보기) |
+| 422 | 입력 검증 오류 (`detail` 배열, 예: `choice` < 0) | 일반 안내 문구 |
+
+> **[확인 필요: 상민]** 400은 오류 코드 없이 문구로만 구분된다. 프론트는 `"진단이 이미 끝났어요"` 문구를
+> 비교하므로 문구를 바꾸면 프론트도 같이 바꿔야 한다. 오류 코드 필드(예: `"code": "DIAGNOSIS_FINISHED"`)를
+> 추가할 수 있을지 확인해 주세요.
+
+### GET /diagnosis/result
+
+> **[확인 필요: 상민]** mock은 사용자와 관계없이 같은 결과를 돌려준다. 실제 구현에서는 토큰의 사용자 결과를
+> 돌려주는지, 진단을 끝내지 않았을 때 어떤 응답(상태 코드·`detail`)을 주는지 정해 주세요.
+
+성공 (200):
+
+```json
+{
+  "concepts": [
+    { "id": "array", "name": "배열", "course": "C", "prereqs": [], "mastery": 0.85, "source": "diagnosed" }
+  ]
+}
+```
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | string | 개념 id |
+| `name` | string | 개념 이름 |
+| `course` | string | 과목 코드 |
+| `prereqs` | string[] | 선수 개념 id |
+| `mastery` | number | 0~1. 그래프 색깔에 사용 |
+| `source` | `"prior"` \| `"diagnosed"` | prior: 망각 추정값, diagnosed: 진단 문제로 확인한 값 |
