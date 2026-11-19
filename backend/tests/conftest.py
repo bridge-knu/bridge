@@ -5,6 +5,9 @@
 - Redis: 실제 Redis 대신 메모리용 가짜(fakeredis)를 쓴다.
 """
 
+import os
+import secrets
+
 import fakeredis
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +19,9 @@ from app import login_lock, security
 from app.db import database_url, get_db
 from app.main import app
 from app.seed import ensure_demo_user
+
+# 테스트를 실행할 때마다 새로 만드는 서명 키. 서명·검증할 때 읽으므로 앱을 불러온 뒤에 넣어도 된다.
+os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 
 
 @pytest.fixture(autouse=True)

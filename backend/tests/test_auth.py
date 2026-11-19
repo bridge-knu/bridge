@@ -2,11 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app import login_lock
 from app.models import User
-from app.security import JWT_ALGORITHM, jwt_secret, verify_pin
+from app.main import app
+from app.security import JWT_ALGORITHM, JwtSecretError, jwt_secret, verify_pin
 
 WRONG_PIN = {"detail": "아이디 또는 PIN이 틀렸어요"}
 LOCKED = {"detail": "1분 후 다시 시도해 주세요"}
@@ -147,3 +149,44 @@ def test_token_signed_with_other_secret_is_401(api_client, login, db):
 )
 def test_all_apis_except_login_need_token(api_client, method, path):
     assert api_client.request(method, path, json={}).status_code == 401
+
+
+# ---- 서명 키·필수 클레임 (토큰 위조 방지) ----
+
+
+def demo_user_id(db) -> int:
+    return db.scalar(select(User.id).where(User.login_id == "demo"))
+
+
+@pytest.mark.parametrize("secret", ["dev-only-secret-change-me", "change-me"])
+def test_token_signed_with_public_secret_is_401(api_client, db, secret):
+    now = datetime.now(timezone.utc)
+    claims = {"sub": str(demo_user_id(db)), "iat": now, "exp": now + timedelta(hours=1)}
+    forged = jwt.encode(claims, secret, algorithm=JWT_ALGORITHM)
+    assert api_client.get("/plan", headers={"Authorization": f"Bearer {forged}"}).status_code == 401
+
+
+@pytest.mark.parametrize("missing", ["exp", "iat", "sub"])
+def test_token_without_required_claim_is_401(api_client, db, missing):
+    now = datetime.now(timezone.utc)
+    claims = {"sub": str(demo_user_id(db)), "iat": now, "exp": now + timedelta(hours=1)}
+    del claims[missing]
+    token = jwt.encode(claims, jwt_secret(), algorithm=JWT_ALGORITHM)
+    assert api_client.get("/plan", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+@pytest.mark.parametrize("value", [None, "", "change-me", "dev-only-secret-change-me", "short-secret"])
+def test_unsafe_jwt_secret_is_rejected(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+    else:
+        monkeypatch.setenv("JWT_SECRET", value)
+    with pytest.raises(JwtSecretError):
+        jwt_secret()
+
+
+def test_server_does_not_start_with_unsafe_secret(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "change-me")
+    with pytest.raises(JwtSecretError):
+        with TestClient(app):
+            pass

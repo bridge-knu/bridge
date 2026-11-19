@@ -9,6 +9,8 @@
 git clone https://github.com/bridge-knu/bridge.git
 cd bridge
 cp .env.example .env
+# 로그인 토큰 서명 키를 만들어 .env의 JWT_SECRET= 뒤에 넣기 (없으면 backend가 시작하지 않음)
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 docker compose up -d
 ```
 
