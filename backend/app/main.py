@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import auth, blocks, code, diagnosis, health, plan, profile, run
 
 app = FastAPI(title="Bridge API")
 
-app.include_router(health.router)
+for module in (health, auth, profile, diagnosis, plan, blocks, code, run):
+    app.include_router(module.router)
