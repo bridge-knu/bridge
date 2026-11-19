@@ -18,17 +18,19 @@ def _raw(sample: ContentSet) -> dict:
     return copy.deepcopy(sample.model_dump(by_alias=True))
 
 
-def test_sample_content_loads(sample):
-    assert {c.id for c in sample.concepts} == {"array", "pointer", "linked_list"}
-    assert len(sample.questions) == 6
-    assert len(sample.blocks) == 3
+def test_content_loads(sample):
+    assert len(sample.concepts) == 22
+    assert {c.course for c in sample.concepts} == {"C", "DS"}
+    # 개념마다 진단 문제 2개 이상
+    for c in sample.concepts:
+        assert sum(q.concept == c.id for q in sample.questions) >= 2, c.id
     assert sample.blocks[0].video_start == 0
 
 
 def test_unknown_prereq_is_error(sample):
     raw = _raw(sample)
-    raw["concepts"][1]["prereqs"].append("variable")
-    with pytest.raises(ValidationError, match="선수 개념 'variable'"):
+    raw["concepts"][1]["prereqs"].append("ghost")
+    with pytest.raises(ValidationError, match="선수 개념 'ghost'"):
         ContentSet(**raw)
 
 

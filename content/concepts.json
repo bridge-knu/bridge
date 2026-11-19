@@ -1,9 +1,69 @@
 [
   {
+    "id": "variable",
+    "name": "변수와 자료형",
+    "course": "C",
+    "prereqs": [],
+    "stability": 36,
+    "blocks": 1
+  },
+  {
+    "id": "operator",
+    "name": "연산자",
+    "course": "C",
+    "prereqs": [
+      "variable"
+    ],
+    "stability": 36,
+    "blocks": 1
+  },
+  {
+    "id": "condition",
+    "name": "조건문",
+    "course": "C",
+    "prereqs": [
+      "operator"
+    ],
+    "stability": 36,
+    "blocks": 1
+  },
+  {
+    "id": "loop",
+    "name": "반복문",
+    "course": "C",
+    "prereqs": [
+      "condition"
+    ],
+    "stability": 36,
+    "blocks": 1
+  },
+  {
+    "id": "function",
+    "name": "함수",
+    "course": "C",
+    "prereqs": [
+      "loop"
+    ],
+    "stability": 24,
+    "blocks": 1
+  },
+  {
+    "id": "recursion",
+    "name": "재귀",
+    "course": "C",
+    "prereqs": [
+      "function"
+    ],
+    "stability": 12,
+    "blocks": 2
+  },
+  {
     "id": "array",
     "name": "배열",
     "course": "C",
-    "prereqs": [],
+    "prereqs": [
+      "loop"
+    ],
     "stability": 24,
     "blocks": 1
   },
@@ -12,19 +72,164 @@
     "name": "포인터",
     "course": "C",
     "prereqs": [
-      "array"
+      "array",
+      "function"
     ],
     "stability": 12,
     "blocks": 2
+  },
+  {
+    "id": "string",
+    "name": "문자열",
+    "course": "C",
+    "prereqs": [
+      "array",
+      "pointer"
+    ],
+    "stability": 18,
+    "blocks": 1
+  },
+  {
+    "id": "struct",
+    "name": "구조체",
+    "course": "C",
+    "prereqs": [
+      "variable"
+    ],
+    "stability": 18,
+    "blocks": 1
+  },
+  {
+    "id": "dynamic_alloc",
+    "name": "동적 할당",
+    "course": "C",
+    "prereqs": [
+      "pointer"
+    ],
+    "stability": 12,
+    "blocks": 1
+  },
+  {
+    "id": "complexity",
+    "name": "성능 분석(Big-O)",
+    "course": "DS",
+    "prereqs": [
+      "loop",
+      "function"
+    ],
+    "stability": 24,
+    "blocks": 1
+  },
+  {
+    "id": "binary_search",
+    "name": "이진 탐색",
+    "course": "DS",
+    "prereqs": [
+      "array",
+      "complexity"
+    ],
+    "stability": 18,
+    "blocks": 1
+  },
+  {
+    "id": "stack",
+    "name": "스택",
+    "course": "DS",
+    "prereqs": [
+      "array",
+      "struct"
+    ],
+    "stability": 18,
+    "blocks": 1
+  },
+  {
+    "id": "queue",
+    "name": "큐(원형 큐)",
+    "course": "DS",
+    "prereqs": [
+      "array",
+      "struct"
+    ],
+    "stability": 18,
+    "blocks": 1
   },
   {
     "id": "linked_list",
     "name": "연결 리스트",
     "course": "DS",
     "prereqs": [
-      "pointer"
+      "struct",
+      "dynamic_alloc"
     ],
     "stability": 12,
     "blocks": 2
+  },
+  {
+    "id": "binary_tree",
+    "name": "이진 트리·순회",
+    "course": "DS",
+    "prereqs": [
+      "linked_list",
+      "recursion"
+    ],
+    "stability": 12,
+    "blocks": 2
+  },
+  {
+    "id": "heap",
+    "name": "힙",
+    "course": "DS",
+    "prereqs": [
+      "binary_tree",
+      "array"
+    ],
+    "stability": 12,
+    "blocks": 1
+  },
+  {
+    "id": "bst",
+    "name": "이진 탐색 트리",
+    "course": "DS",
+    "prereqs": [
+      "binary_tree",
+      "binary_search"
+    ],
+    "stability": 12,
+    "blocks": 2
+  },
+  {
+    "id": "graph",
+    "name": "그래프(탐색·신장 트리)",
+    "course": "DS",
+    "prereqs": [
+      "linked_list",
+      "queue",
+      "recursion"
+    ],
+    "stability": 12,
+    "blocks": 2
+  },
+  {
+    "id": "sorting",
+    "name": "정렬",
+    "course": "DS",
+    "prereqs": [
+      "array",
+      "complexity",
+      "recursion"
+    ],
+    "stability": 18,
+    "blocks": 2
+  },
+  {
+    "id": "hashing",
+    "name": "해싱",
+    "course": "DS",
+    "prereqs": [
+      "array",
+      "linked_list"
+    ],
+    "stability": 12,
+    "blocks": 1
   }
 ]
