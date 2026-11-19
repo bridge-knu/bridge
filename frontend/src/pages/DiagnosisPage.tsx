@@ -1,13 +1,10 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, setAuthToken } from '../api.ts'
+import { classifyDiagnosisError } from '../diagnosis/errors.ts'
 import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
 type Phase = 'intro' | 'question' | 'done'
-
-// POST /diagnosis/answer의 400 detail (backend/app/api/diagnosis.py). 백엔드에 오류 코드가 없어 문구로 구분한다.
-// 이미 끝난 진단은 다시 시작하면 결과가 지워지므로 완료 화면으로 보낸다.
-const DIAGNOSIS_FINISHED_DETAIL = '진단이 이미 끝났어요'
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? '잠시 후 다시 시도해 주세요'
@@ -40,19 +37,19 @@ export default function DiagnosisPage() {
       setSelected(null)
       setPhase(next.question ? 'question' : 'done')
     } catch (err) {
+      const kind = classifyDiagnosisError(err)
       // 토큰이 없거나 만료됨 (새로고침하면 메모리 토큰이 사라짐) → 다시 로그인
-      if (err instanceof ApiError && err.status === 401) {
+      if (kind === 'unauthorized') {
         setAuthToken(null)
         navigate('/login', { replace: true })
         return
       }
-      if (err instanceof ApiError && err.status === 400) {
-        if (err.detail === DIAGNOSIS_FINISHED_DETAIL) {
-          setPhase('done')
-          return
-        }
-        setNeedsRestart(true)
+      // 이미 끝난 진단은 다시 시작하면 결과가 지워지므로 완료 화면으로 보낸다.
+      if (kind === 'finished') {
+        setPhase('done')
+        return
       }
+      if (kind === 'mismatch') setNeedsRestart(true)
       setError(errorMessage(err))
     } finally {
       inFlight.current = false
