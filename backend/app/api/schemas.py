@@ -40,12 +40,15 @@ class LoginResponse(CamelModel):
 # 과목 코드. content/concepts.json의 course와 같다 (C: C프로그래밍, DS: 자료구조).
 CourseCode = Literal["C", "DS"]
 
+# 성적 원본 값. D/F → 미이수, P → B 같은 정규화는 엔진이 한다.
+Grade = Literal["A+", "A0", "A-", "B+", "B0", "B-", "C+", "C0", "C-", "D+", "D0", "D-", "F", "P"]
+
 
 class CompletedCourse(CamelModel):
     """성적은 받은 그대로 저장한다 (A+, B0, P 등). 정규화는 엔진이 한다."""
 
     course: CourseCode = Field(examples=["C"])
-    grade: str | None = Field(default=None, examples=["A+"])
+    grade: Grade = Field(examples=["A+"])
 
 
 class Profile(CamelModel):
