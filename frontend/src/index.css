@@ -100,3 +100,114 @@ a {
   margin: 0;
   color: #b91c1c;
 }
+
+.form-page {
+  max-width: 480px;
+  margin: 2rem auto;
+}
+
+.form-hint {
+  color: #6b7280;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.form legend {
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.form input,
+.form select {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+}
+
+.form button {
+  font: inherit;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form button:disabled {
+  background-color: #93c5fd;
+  cursor: default;
+}
+
+.form-error {
+  margin: 0;
+  color: #b91c1c;
+}
+
+.diagnosis-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.diagnosis-progress progress {
+  flex: 1;
+  accent-color: #2563eb;
+}
+
+.diagnosis-prompt {
+  font-size: 1.25rem;
+}
+
+.diagnosis-code {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  background-color: #1f2937;
+  color: #f9fafb;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.form .diagnosis-choices label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.form .diagnosis-choices label.selected {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}

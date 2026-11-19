@@ -47,11 +47,26 @@ def test_save_profile(client):
         {"gapMonths": 121},
         {"targetCourse": "자료구조"},
         {"completedCourses": [{"course": "C프로그래밍", "grade": "B+"}]},
+        {"completedCourses": [{"course": "C"}]},
+        {"completedCourses": [{"course": "C", "grade": None}]},
+        {"completedCourses": [{"course": "C", "grade": "A"}]},
+        {"completedCourses": [{"course": "C", "grade": "a+"}]},
+        {"completedCourses": [{"course": "C", "grade": "E"}]},
     ],
 )
 def test_profile_rejects_invalid_values(client, change):
     r = client.put("/profile", json={**PROFILE, **change})
     assert r.status_code == 422
+
+
+ALL_GRADES = ["A+", "A0", "A-", "B+", "B0", "B-", "C+", "C0", "C-", "D+", "D0", "D-", "F", "P"]
+
+
+@pytest.mark.parametrize("grade", ALL_GRADES)
+def test_profile_accepts_all_14_grades(client, grade):
+    r = client.put("/profile", json={**PROFILE, "completedCourses": [{"course": "C", "grade": grade}]})
+    assert r.status_code == 200
+    assert r.json()["completedCourses"][0]["grade"] == grade
 
 
 def test_profile_keeps_raw_grade(client):
