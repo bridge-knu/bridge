@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from fastapi import Header
+from fastapi import Depends
+
+from app.api.deps import get_current_user
+from app.models import User
 
 CONCEPTS = [
     {"id": "array", "name": "배열", "course": "C", "prereqs": []},
@@ -144,17 +147,17 @@ class UserState:
 @dataclass
 class Job:
     job_id: str
+    user_id: int
     created: float
     lang: str
     code: str
     block_id: str | None
 
 
-USERS: dict[str, UserState] = {}
+USERS: dict[int, UserState] = {}
 JOBS: dict[str, Job] = {}
 
 
-def current_user(authorization: str | None = Header(default=None)) -> UserState:
-    """mock 단계에서는 토큰을 검사하지 않는다. 토큰별로 상태만 따로 둔다 (없으면 공용)."""
-    key = authorization or "anonymous"
-    return USERS.setdefault(key, UserState())
+def current_user(user: User = Depends(get_current_user)) -> UserState:
+    """로그인한 사용자의 mock 상태. 토큰이 없거나 잘못되면 get_current_user가 401을 낸다."""
+    return USERS.setdefault(user.id, UserState())

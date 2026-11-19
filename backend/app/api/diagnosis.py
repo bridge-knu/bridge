@@ -70,7 +70,7 @@ def answer(body: DiagnosisAnswerRequest, user: UserState = Depends(current_user)
 
 
 @router.get("/result", response_model=DiagnosisResult, summary="개념별 mastery (그래프용)")
-def result():
+def result(_: UserState = Depends(current_user)):
     return DiagnosisResult(
         concepts=[
             ConceptResult(**c, mastery=MASTERY[c["id"]][0], source=MASTERY[c["id"]][1])

@@ -1,56 +1,21 @@
 import time
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.api import mock_data, run
-from app.main import app
 
 
 @pytest.fixture
-def client():
+def client(api_client, login):
     mock_data.USERS.clear()
     mock_data.JOBS.clear()
-    c = TestClient(app)
-    c.headers["Authorization"] = "Bearer mock-token-test"
-    return c
+    api_client.headers["Authorization"] = f"Bearer {login('tester')}"
+    return api_client
 
 
 @pytest.fixture
 def instant_run(monkeypatch):
     monkeypatch.setattr(run, "MOCK_RUN_SECONDS", 0)
-
-
-# ---- 인증 ----
-
-
-def test_login_new_user(client):
-    r = client.post("/auth/login", json={"loginId": "kim", "pin": "1234"})
-    assert r.status_code == 200
-    assert r.json() == {"token": "mock-token-kim", "isNewUser": True}
-
-
-def test_login_demo_is_existing_user(client):
-    r = client.post("/auth/login", json={"loginId": "demo", "pin": "0000"})
-    assert r.json()["isNewUser"] is False
-
-
-def test_login_wrong_pin(client):
-    r = client.post("/auth/login", json={"loginId": "kim", "pin": "9999"})
-    assert r.status_code == 401
-    assert r.json() == {"detail": "아이디 또는 PIN이 틀렸어요"}
-
-
-def test_login_locked(client):
-    r = client.post("/auth/login", json={"loginId": "locked", "pin": "1234"})
-    assert r.status_code == 429
-    assert r.json() == {"detail": "1분 후 다시 시도해 주세요"}
-
-
-@pytest.mark.parametrize("pin", ["123", "12345", "abcd"])
-def test_login_pin_must_be_4_digits(client, pin):
-    r = client.post("/auth/login", json={"loginId": "kim", "pin": pin})
-    assert r.status_code == 422
 
 
 # ---- 프로필 ----
@@ -185,9 +150,10 @@ def test_save_code_then_load(client):
     assert b["savedAt"] is not None
 
 
-def test_saved_code_is_per_user(client):
+def test_saved_code_is_per_user(client, login):
     client.put("/code/b-array-1", json={"code": "mine"})
-    other = client.get("/blocks/b-array-1", headers={"Authorization": "Bearer other"}).json()
+    other_token = login("other")
+    other = client.get("/blocks/b-array-1", headers={"Authorization": f"Bearer {other_token}"}).json()
     assert other["savedCode"] is None
 
 
@@ -259,6 +225,12 @@ def test_run_compile_error(client, instant_run):
 
 def test_run_unknown_job(client):
     assert client.get("/run/nope").status_code == 404
+
+
+def test_run_job_of_other_user_is_hidden(client, login):
+    job_id = client.post("/run", json={"lang": "c", "code": "x"}).json()["jobId"]
+    other = {"Authorization": f"Bearer {login('other')}"}
+    assert client.get(f"/run/{job_id}", headers=other).status_code == 404
 
 
 def test_all_12_endpoints_in_docs(client):
