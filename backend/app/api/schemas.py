@@ -124,11 +124,24 @@ class PlanDay(CamelModel):
     blocks: list[PlanBlock]
 
 
+class DeferredConcept(CamelModel):
+    """복학일까지 시간이 부족해 복학 후로 미룬 개념."""
+
+    concept_id: str
+    concept_name: str
+    blocks: int = Field(description="이 개념에 필요했던 30분 블록 수")
+
+
 class Plan(CamelModel):
     return_date: date
     daily_minutes: int
     today_remaining_minutes: int
     days: list[PlanDay]
+    deferred_concepts: list[DeferredConcept] = Field(default_factory=list)
+    message: str | None = Field(
+        default=None,
+        description="미룬 개념이 있을 때만 안내 문구 (예: 시간이 부족해 연결 리스트은(는) 복학 후로 미뤘어요)",
+    )
 
 
 # ---- 블록 학습 ----

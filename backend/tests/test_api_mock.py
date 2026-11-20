@@ -155,6 +155,27 @@ def test_plan_uses_daily_minutes(client):
     assert client.get("/plan").json() == plan
 
 
+def test_plan_has_no_deferred_when_time_is_enough(client):
+    client.put("/profile", json=PROFILE)
+    plan = client.post("/plan/generate").json()
+    assert plan["deferredConcepts"] == []
+    assert plan["message"] is None
+
+
+def test_plan_defers_concepts_when_time_is_short(client):
+    from datetime import date, timedelta
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    client.put("/profile", json={**PROFILE, "returnDate": tomorrow, "dailyMinutes": 30})  # 블록 1개만 가능
+    plan = client.post("/plan/generate").json()
+    assert [b["blockId"] for d in plan["days"] for b in d["blocks"]] == ["b-array-1"]
+    assert plan["deferredConcepts"] == [
+        {"conceptId": "pointer", "conceptName": "포인터", "blocks": 1},
+        {"conceptId": "linked_list", "conceptName": "연결 리스트", "blocks": 1},
+    ]
+    assert plan["message"] == "시간이 부족해 포인터, 연결 리스트은(는) 복학 후로 미뤘어요"
+
+
 def test_plan_without_profile(client):
     plan = client.get("/plan").json()
     assert len(plan["days"]) >= 1

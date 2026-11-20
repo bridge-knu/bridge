@@ -79,6 +79,10 @@ docs/           개발 문서
 - 저장한 코드는 `GET /blocks/{blockId}`의 `savedCode`, `savedAt`으로 돌아옵니다.
 - `GET /plan`의 `dailyMinutes`, `returnDate`도 저장된 프로필을 씁니다.
 
+### 플랜의 미룬 개념
+
+복학일까지 시간이 부족하면 `POST /plan/generate`, `GET /plan` 응답의 `deferredConcepts`에 복학 후로 미룬 개념(`conceptId`, `conceptName`, `blocks`)이, `message`에 안내 문구가 옵니다. 미룬 개념이 없으면 `[]`와 `null`입니다. mock에서는 프로필의 복학일을 내일, 하루 30분으로 저장하면 확인할 수 있습니다.
+
 ### 아직 mock인 API
 
 진단·플랜·블록 완료·코드 실행은 엔진과 샌드박스가 연결되기 전까지 가짜 데이터를 돌려줍니다. 이 상태는 서버를 재시작하면 사라집니다. 화면에서 오류 상황을 확인할 때 아래 값을 쓰세요.
