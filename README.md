@@ -28,6 +28,7 @@ docker compose up -d
 | backend | 8000 | FastAPI |
 | db | 5432 | PostgreSQL 16 |
 | redis | 6379 | Redis 7 |
+| worker | - | 코드 실행 작업 처리 (샌드박스 컨테이너 실행) |
 
 ## 폴더 구조
 
@@ -74,14 +75,28 @@ docs/           개발 문서
 
 ### 아직 mock인 API
 
-로그인을 뺀 나머지는 DB와 엔진이 연결되기 전까지 가짜 데이터를 돌려줍니다. 저장한 값은 서버를 재시작하면 사라집니다. 화면에서 오류 상황을 확인할 때 아래 값을 쓰세요.
+로그인을 뺀 나머지는 DB와 엔진이 연결되기 전까지 가짜 데이터를 돌려줍니다. 저장한 값은 서버를 재시작하면 사라집니다. 코드 실행(`/run`)은 아래처럼 실제로 실행합니다.
 
-| 상황 | 방법 |
+### 코드 실행 샌드박스
+
+`POST /run`이 작업을 Redis 큐에 넣으면 worker 컨테이너가 꺼내서 작업마다 새 `bridge-sandbox` 컨테이너(gcc, python)로 실행합니다. 화면은 `GET /run/{jobId}`를 0.5초마다 불러서 `status`가 `queued` → `running` → `done`이 되면 결과를 보여 주면 됩니다.
+
+| 제한 | 값 |
 | --- | --- |
-| 코드 실행 시간 초과 | 코드에 `while (1)` 또는 `for (;;)` |
-| 컴파일 에러 | 코드에 `COMPILE_ERROR` |
+| 실행 시간 | 5초 (넘으면 `timedOut: true`, `exitCode: 124`) |
+| 컴파일 시간 | 10초 |
+| 메모리 / CPU / 프로세스 | 128MB / 0.5개 / 64개 |
+| 출력 | 64KB (넘는 부분은 잘림) |
+| 네트워크 | 차단 |
+| 파일 쓰기 | `/tmp`(16MB)만 |
+| 동시 실행 | 4개, 나머지는 큐에서 대기 |
 
-코드 실행은 1초 동안 `running`이었다가 `done`이 됩니다.
+- 컴파일 에러는 `stderr`에 gcc 메시지가 그대로 오고 `exitCode`가 0이 아닙니다.
+- `blockId`를 보내면 블록의 정답 출력과 비교해서 `matchesExpected`를 줍니다 (줄 끝 공백·마지막 줄바꿈 차이는 무시).
+- 90초가 지나도 끝나지 않은 작업은 실패(`exitCode: 1`)로 돌려줍니다.
+- 결과는 1시간 동안 보관합니다.
+
+`docker compose up -d --build`를 하면 샌드박스 이미지 빌드와 worker 실행까지 같이 됩니다. worker는 호스트의 Docker(`/var/run/docker.sock`)로 컨테이너를 띄웁니다.
 
 ## DB
 
@@ -104,6 +119,6 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-API·DB 테스트는 `docker compose up -d`로 postgres가 떠 있을 때만 실행되고, 없으면 건너뜁니다. Redis는 테스트용 가짜(fakeredis)를 씁니다. 테스트 데이터는 끝나면 되돌려서 DB에 남지 않습니다.
+API·DB 테스트는 `docker compose up -d`로 postgres가 떠 있을 때만 실행되고, 없으면 건너뜁니다. 실제 샌드박스 테스트(`tests/test_sandbox.py`)는 `bridge-sandbox` 이미지와 `docker` 명령이 있을 때만 실행됩니다. Redis는 테스트용 가짜(fakeredis)를 씁니다. 테스트 데이터는 끝나면 되돌려서 DB에 남지 않습니다.
 
 개발 규칙은 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)를 참고하세요.

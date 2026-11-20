@@ -144,18 +144,7 @@ class UserState:
     code: dict[str, tuple[str, datetime]] = field(default_factory=dict)
 
 
-@dataclass
-class Job:
-    job_id: str
-    user_id: int
-    created: float
-    lang: str
-    code: str
-    block_id: str | None
-
-
 USERS: dict[int, UserState] = {}
-JOBS: dict[str, Job] = {}
 
 
 def current_user(user: User = Depends(get_current_user)) -> UserState:
