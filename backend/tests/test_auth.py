@@ -31,8 +31,14 @@ def test_new_id_signs_up(api_client, db):
     assert verify_pin("1234", user.pin_hash)
 
 
-def test_second_login_is_existing_user(api_client):
-    post_login(api_client, "kim", "1234")
+def test_is_new_user_until_profile_saved(api_client):
+    token = post_login(api_client, "kim", "1234").json()["token"]
+    # 가입만 하고 프로필 입력 전에 나갔다면 다시 프로필 화면으로
+    assert post_login(api_client, "kim", "1234").json()["isNewUser"] is True
+
+    profile = {"completedCourses": [], "gapMonths": 12, "targetCourse": "DS",
+               "returnDate": "2027-03-02", "dailyMinutes": 60}
+    api_client.put("/profile", json=profile, headers={"Authorization": f"Bearer {token}"})
     r = post_login(api_client, "kim", "1234")
     assert r.status_code == 200
     assert r.json()["isNewUser"] is False

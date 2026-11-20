@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user
 from app.api.diagnosis import question_out
 from app.api.mock_data import BLOCK_BY_ID, BLOCKS, CONCEPT_NAME, QUESTION_BY_ID, UserState, current_user
 from app.api.schemas import (
@@ -10,6 +13,8 @@ from app.api.schemas import (
     Practice,
     Video,
 )
+from app.db import get_db
+from app.models import CodeSnapshot, User
 
 router = APIRouter(prefix="/blocks", tags=["blocks"])
 
@@ -24,9 +29,14 @@ def get_block_or_404(block_id: str) -> dict:
 
 
 @router.get("/{block_id}", response_model=BlockDetail, responses=NOT_FOUND, summary="강의 링크·실습·확인 문제")
-def get_block(block_id: str, user: UserState = Depends(current_user)):
+def get_block(
+    block_id: str,
+    user: UserState = Depends(current_user),
+    account: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     b = get_block_or_404(block_id)
-    saved = user.code.get(block_id)
+    saved = db.get(CodeSnapshot, (account.id, block_id))
     return BlockDetail(
         id=b["id"],
         concept_id=b["concept"],
@@ -35,8 +45,8 @@ def get_block(block_id: str, user: UserState = Depends(current_user)):
         video=Video(**b["video"]),
         practice=Practice(**b["practice"]),
         check_questions=[question_out(q) for q in b["check"]],
-        saved_code=saved[0] if saved else None,
-        saved_at=saved[1] if saved else None,
+        saved_code=saved.code if saved else None,
+        saved_at=saved.updated_at if saved else None,
         done=block_id in user.done_blocks,
     )
 

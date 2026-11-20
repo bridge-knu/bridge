@@ -1,8 +1,10 @@
 import time
 
 import pytest
+from sqlalchemy import select
 
 from app.api import mock_data, run
+from app.models import CodeSnapshot, Profile, User
 
 
 @pytest.fixture
@@ -73,6 +75,31 @@ def test_profile_keeps_raw_grade(client):
     courses = [{"course": "C", "grade": "A+"}, {"course": "DS", "grade": "P"}]
     r = client.put("/profile", json={**PROFILE, "completedCourses": courses})
     assert r.json()["completedCourses"] == courses
+
+
+def user_id(db, login_id="tester"):
+    return db.scalar(select(User.id).where(User.login_id == login_id))
+
+
+def test_profile_is_saved_in_db(client, db):
+    client.put("/profile", json=PROFILE)
+    row = db.get(Profile, user_id(db))
+    assert row.gap_months == 24
+    assert row.completed_courses == [{"course": "C", "grade": "A+"}]
+    assert str(row.return_date) == "2027-03-02"
+
+
+def test_profile_save_overwrites(client, db):
+    first = client.put("/profile", json=PROFILE).json()
+    second = client.put("/profile", json={**PROFILE, "dailyMinutes": 120}).json()
+    assert second["dailyMinutes"] == 120
+    assert second["updatedAt"] > first["updatedAt"]
+    assert db.get(Profile, user_id(db)).daily_minutes == 120
+
+
+def test_demo_has_profile(api_client, db):
+    row = db.get(Profile, user_id(db, "demo"))
+    assert row is not None and row.target_course == "DS"
 
 
 # ---- 진단 ----
