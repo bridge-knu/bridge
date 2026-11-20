@@ -6,37 +6,12 @@
 import datetime as dt
 
 import pytest
-from sqlalchemy import create_engine, inspect, select
-from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy import inspect, select
+from sqlalchemy.exc import IntegrityError
 
-from app.db import database_url
 from app.models import CodeSnapshot, ConceptState, PlanBlock, Profile, User
 
 TABLES = {"users", "profiles", "diagnosis_answers", "concept_states", "plan_blocks", "code_snapshots"}
-
-
-@pytest.fixture(scope="module")
-def engine():
-    eng = create_engine(database_url())
-    try:
-        with eng.connect():
-            pass
-    except OperationalError:
-        pytest.skip("postgres에 연결할 수 없음 (docker compose up -d 필요)")
-    yield eng
-    eng.dispose()
-
-
-@pytest.fixture
-def db(engine):
-    conn = engine.connect()
-    tx = conn.begin()
-    session = Session(bind=conn, join_transaction_mode="create_savepoint")
-    yield session
-    session.close()
-    tx.rollback()
-    conn.close()
 
 
 def make_user(db, login_id="tester"):

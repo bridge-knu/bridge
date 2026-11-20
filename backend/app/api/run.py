@@ -2,11 +2,13 @@ import re
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.blocks import get_block_or_404
+from app.api.deps import get_current_user
 from app.api.mock_data import BLOCK_BY_ID, JOBS, Job
 from app.api.schemas import ErrorResponse, RunAccepted, RunRequest, RunResult
+from app.models import User
 
 router = APIRouter(prefix="/run", tags=["run"])
 
@@ -26,11 +28,11 @@ INFINITE_LOOP = re.compile(r"while\s*\(\s*1\s*\)|for\s*\(\s*;\s*;\s*\)|while\s+T
         "그 외에는 blockId가 있으면 정답 출력, 없으면 hello."
     ),
 )
-def run(body: RunRequest):
+def run(body: RunRequest, user: User = Depends(get_current_user)):
     if body.block_id is not None:
         get_block_or_404(body.block_id)
     job_id = uuid.uuid4().hex
-    JOBS[job_id] = Job(job_id, time.monotonic(), body.lang, body.code, body.block_id)
+    JOBS[job_id] = Job(job_id, user.id, time.monotonic(), body.lang, body.code, body.block_id)
     return RunAccepted(job_id=job_id)
 
 
@@ -41,9 +43,9 @@ def run(body: RunRequest):
     summary="실행 결과 (출력, 에러, 시간 초과)",
     description="프론트는 status가 done이 될 때까지 0.5초마다 호출한다.",
 )
-def result(job_id: str):
+def result(job_id: str, user: User = Depends(get_current_user)):
     job = JOBS.get(job_id)
-    if job is None:
+    if job is None or job.user_id != user.id:
         raise HTTPException(404, "실행 작업을 찾을 수 없어요")
     if time.monotonic() - job.created < MOCK_RUN_SECONDS:
         return RunResult(job_id=job_id, status="running")
