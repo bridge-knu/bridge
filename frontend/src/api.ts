@@ -227,14 +227,54 @@ export function getDiagnosisResult() {
 
 // ---- 플랜 ----
 
-/** POST /plan/generate: 역산 플랜 생성 */
+export interface PlanBlock {
+  /** 그날 안에서의 순서 (1부터) */
+  order: number
+  blockId: string
+  conceptId: string
+  conceptName: string
+  minutes: number
+  done: boolean
+}
+
+export interface PlanDay {
+  /** YYYY-MM-DD */
+  date: string
+  blocks: PlanBlock[]
+}
+
+/** 복학일까지 시간이 부족해 복학 후로 미룬 개념 */
+export interface DeferredConcept {
+  conceptId: string
+  conceptName: string
+  /** 이 개념에 필요했던 30분 블록 수 */
+  blocks: number
+}
+
+export interface Plan {
+  /** YYYY-MM-DD */
+  returnDate: string
+  dailyMinutes: number
+  /** 오늘 날짜 블록 중 아직 끝내지 않은 블록의 분 합계 (백엔드가 계산) */
+  todayRemainingMinutes: number
+  days: PlanDay[]
+  /**
+   * 미룬 개념. main의 mock 스키마에는 아직 없고 PR #38(백엔드)에서 추가된다.
+   * 필드가 없으면(undefined) 미룬 개념 정보를 모르는 것으로 보고 표시하지 않는다.
+   */
+  deferredConcepts?: DeferredConcept[]
+  /** 미룬 개념이 있을 때만 오는 안내 문구 (PR #38) */
+  message?: string | null
+}
+
+/** POST /plan/generate: 역산 플랜 생성 (요청 본문 없음, 프로필·진단 결과는 서버가 읽음) */
 export function generatePlan() {
-  return request<unknown>('POST', '/plan/generate')
+  return request<Plan>('POST', '/plan/generate')
 }
 
 /** GET /plan: 날짜별 블록 목록, 오늘 남은 시간 */
 export function getPlan() {
-  return request<unknown>('GET', '/plan')
+  return request<Plan>('GET', '/plan')
 }
 
 // ---- 블록 학습 ----
