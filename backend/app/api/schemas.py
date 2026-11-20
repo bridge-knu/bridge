@@ -18,7 +18,8 @@ class CamelModel(BaseModel):
 
 
 class ErrorResponse(CamelModel):
-    detail: str
+    detail: str = Field(description="사용자에게 보여 줄 안내 문구")
+    code: str = Field(description="화면 분기용 오류 코드 (README 참고)")
 
 
 # ---- 인증 ----

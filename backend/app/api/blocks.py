@@ -1,25 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.api.diagnosis import question_out
+from app.api.errors import ApiError, responses
 from app.api.mock_data import BLOCK_BY_ID, BLOCKS, CONCEPT_NAME, QUESTION_BY_ID, UserState, current_user
 from app.api.schemas import (
     BlockDetail,
     CompleteRequest,
     CompleteResponse,
-    ErrorResponse,
     Practice,
     Video,
 )
 
 router = APIRouter(prefix="/blocks", tags=["blocks"])
 
-NOT_FOUND = {404: {"model": ErrorResponse}}
+NOT_FOUND = responses("BLOCK_NOT_FOUND")
 
 
 def get_block_or_404(block_id: str) -> dict:
     block = BLOCK_BY_ID.get(block_id)
     if block is None:
-        raise HTTPException(404, "블록을 찾을 수 없어요")
+        raise ApiError("BLOCK_NOT_FOUND")
     return block
 
 

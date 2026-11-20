@@ -104,9 +104,37 @@ def test_diagnosis_wrong_question_id(client):
     client.post("/diagnosis/start")
     r = client.post("/diagnosis/answer", json={"questionId": "q-xxx", "choice": 0})
     assert r.status_code == 400
+    assert r.json() == {"detail": "지금 풀고 있는 문제가 아니에요", "code": "QUESTION_MISMATCH"}
+
+
+def finish_diagnosis(client):
+    step = client.post("/diagnosis/start").json()
+    while not step["done"]:
+        step = client.post("/diagnosis/answer", json={"questionId": step["question"]["id"], "choice": 0}).json()
+    return step
+
+
+def test_answer_after_finished(client):
+    finish_diagnosis(client)
+    r = client.post("/diagnosis/answer", json={"questionId": "q-array-1", "choice": 0})
+    assert r.status_code == 400
+    assert r.json()["code"] == "DIAGNOSIS_FINISHED"
+
+
+def test_result_before_diagnosis(client):
+    r = client.get("/diagnosis/result")
+    assert r.status_code == 400
+    assert r.json() == {"detail": "진단을 먼저 끝내 주세요", "code": "DIAGNOSIS_NOT_FINISHED"}
+
+
+def test_result_during_diagnosis(client):
+    finish_diagnosis(client)
+    client.post("/diagnosis/start")  # 다시 시작하면 끝날 때까지 결과를 주지 않는다
+    assert client.get("/diagnosis/result").json()["code"] == "DIAGNOSIS_NOT_FINISHED"
 
 
 def test_diagnosis_result(client):
+    finish_diagnosis(client)
     concepts = client.get("/diagnosis/result").json()["concepts"]
     assert [c["id"] for c in concepts] == ["array", "pointer", "linked_list"]
     for c in concepts:
@@ -151,7 +179,7 @@ def test_get_block(client):
 def test_unknown_block_404(client):
     r = client.get("/blocks/nope")
     assert r.status_code == 404
-    assert r.json() == {"detail": "블록을 찾을 수 없어요"}
+    assert r.json() == {"detail": "블록을 찾을 수 없어요", "code": "BLOCK_NOT_FOUND"}
 
 
 def test_save_code_then_load(client):
@@ -239,7 +267,9 @@ def test_run_compile_error(client, instant_run):
 
 
 def test_run_unknown_job(client):
-    assert client.get("/run/nope").status_code == 404
+    r = client.get("/run/nope")
+    assert r.status_code == 404
+    assert r.json() == {"detail": "실행 작업을 찾을 수 없어요", "code": "JOB_NOT_FOUND"}
 
 
 def test_run_job_of_other_user_is_hidden(client, login):
