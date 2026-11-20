@@ -10,20 +10,16 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ApiError, getDiagnosisResult, setAuthToken, type ConceptResult } from '../api.ts'
+import { getDiagnosisResult, setAuthToken, type ConceptResult } from '../api.ts'
 import { findBlockId } from '../graph/blocks.ts'
+import { classifyResultError, resultErrorMessage } from '../graph/errors.ts'
 import { buildConceptGraph, type ConceptNode } from '../graph/layout.ts'
 
 type State =
   | { status: 'loading' }
+  | { status: 'notFinished' }
   | { status: 'error'; message: string }
   | { status: 'ready'; concepts: ConceptResult[] }
-
-function errorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.detail ?? '잠시 후 다시 시도해 주세요'
-  if (err instanceof TypeError) return '서버에 연결할 수 없어요. 네트워크를 확인해 주세요'
-  return '결과를 불러오지 못했어요. 다시 시도해 주세요'
-}
 
 function ConceptNodeView({ data }: NodeProps<ConceptNode>) {
   const percent = Math.round(data.concept.mastery * 100)
@@ -59,13 +55,18 @@ export default function ResultPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
+        const kind = classifyResultError(err)
         // 토큰이 없거나 만료됨 (새로고침하면 메모리 토큰이 사라짐) → 다시 로그인
-        if (err instanceof ApiError && err.status === 401) {
+        if (kind === 'unauthorized') {
           setAuthToken(null)
           navigate('/login', { replace: true })
           return
         }
-        setState({ status: 'error', message: errorMessage(err) })
+        if (kind === 'notFinished') {
+          setState({ status: 'notFinished' })
+          return
+        }
+        setState({ status: 'error', message: resultErrorMessage(err) })
       })
     return () => {
       cancelled = true
@@ -112,11 +113,16 @@ export default function ResultPage() {
     )
   }
 
-  if (!graph || graph.nodes.length === 0) {
+  // 진단을 끝내지 않았거나(400 DIAGNOSIS_NOT_FINISHED) 결과에 개념이 하나도 없음
+  if (state.status === 'notFinished' || !graph || graph.nodes.length === 0) {
     return (
       <section className="form-page">
         <h1>진단 결과</h1>
-        <p className="form-hint">아직 진단 결과가 없어요. 진단을 먼저 진행해 주세요.</p>
+        <p className="form-hint">
+          {state.status === 'notFinished'
+            ? '진단을 먼저 끝내 주세요.'
+            : '아직 진단 결과가 없어요. 진단을 먼저 진행해 주세요.'}
+        </p>
         <div className="form">
           <button type="button" onClick={() => navigate('/diagnosis')}>
             진단하러 가기
