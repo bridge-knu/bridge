@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import auth, blocks, code, diagnosis, health, plan, profile, run
+from app.api import auth, blocks, code, diagnosis, errors, health, plan, profile, run
 from app.db import SessionLocal
 from app.security import jwt_secret
 from app.seed import ensure_demo_user
@@ -17,6 +17,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Bridge API", lifespan=lifespan)
+errors.install(app)
 
 for module in (health, auth, profile, diagnosis, plan, blocks, code, run):
     app.include_router(module.router)

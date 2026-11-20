@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+
+from app.api.errors import ApiError, responses
 
 from app.api.mock_data import (
     CONCEPT_NAME,
@@ -14,7 +16,6 @@ from app.api.schemas import (
     DiagnosisAnswerRequest,
     DiagnosisResult,
     DiagnosisStep,
-    ErrorResponse,
     QuestionOut,
 )
 
@@ -48,29 +49,39 @@ def step(user: UserState, correct: bool | None) -> DiagnosisStep:
 @router.post("/start", response_model=DiagnosisStep, summary="진단 시작, 첫 문제 반환")
 def start(user: UserState = Depends(current_user)):
     user.diagnosis_index = 0
+    user.diagnosis_done = False
     return step(user, None)
 
 
 @router.post(
     "/answer",
     response_model=DiagnosisStep,
-    responses={400: {"model": ErrorResponse}},
+    responses=responses("DIAGNOSIS_FINISHED", "QUESTION_MISMATCH"),
     summary="답 제출 → 다음 문제 또는 종료",
     description="mock은 문제 3개를 고정 순서로 낸다.",
 )
 def answer(body: DiagnosisAnswerRequest, user: UserState = Depends(current_user)):
     if user.diagnosis_index >= len(DIAGNOSIS_ORDER):
-        raise HTTPException(400, "진단이 이미 끝났어요")
+        raise ApiError("DIAGNOSIS_FINISHED")
     expected_id = DIAGNOSIS_ORDER[user.diagnosis_index]
     if body.question_id != expected_id:
-        raise HTTPException(400, "지금 풀고 있는 문제가 아니에요")
+        raise ApiError("QUESTION_MISMATCH")
     correct = body.choice == QUESTION_BY_ID[expected_id]["answer"]
     user.diagnosis_index += 1
+    user.diagnosis_done = user.diagnosis_index >= len(DIAGNOSIS_ORDER)
     return step(user, correct)
 
 
-@router.get("/result", response_model=DiagnosisResult, summary="개념별 mastery (그래프용)")
-def result(_: UserState = Depends(current_user)):
+@router.get(
+    "/result",
+    response_model=DiagnosisResult,
+    responses=responses("DIAGNOSIS_NOT_FINISHED"),
+    summary="개념별 mastery (그래프용)",
+    description="진단을 시작하지 않았거나 끝내지 않았으면 400 DIAGNOSIS_NOT_FINISHED.",
+)
+def result(user: UserState = Depends(current_user)):
+    if not user.diagnosis_done:
+        raise ApiError("DIAGNOSIS_NOT_FINISHED")
     return DiagnosisResult(
         concepts=[
             ConceptResult(**c, mastery=MASTERY[c["id"]][0], source=MASTERY[c["id"]][1])
