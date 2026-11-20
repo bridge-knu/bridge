@@ -127,6 +127,17 @@ def test_target_course_concepts_are_not_asked(g):
     assert not {"stack", "linked_list", "binary_tree"} & set(asked)
 
 
+def test_target_c_diagnoses_c_concepts(g):
+    # 목표가 C면 바깥 선수 개념이 없으므로 C 개념 자체를 진단한다
+    state = start_diagnosis({"completedCourses": [], "gapMonths": 0, "targetCourse": "C"}, g)
+    assert not state.done
+    asked = _run(state, g, lambda q: False)
+    assert asked and set(asked) <= {c for c, course, *_ in CONCEPTS if course == "C"}
+    assert len(asked) <= 10
+    # DS 개념은 결과에도 나오지 않음 (C를 듣는 데 필요 없음)
+    assert not {"stack", "linked_list", "binary_tree"} & set(state.mastery)
+
+
 def test_wrong_question_id_is_rejected(g):
     state = start_diagnosis(_profile(24), g)
     next_question(state, g)
