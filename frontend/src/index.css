@@ -705,3 +705,129 @@ a {
 .concept-node-body span {
   font-size: 0.75rem;
 }
+
+/* ---- 학사 안내 (C7) ---- */
+
+.academic-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.academic-form {
+  max-width: 480px;
+}
+
+.academic-semester {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.academic-results {
+  margin-top: 2rem;
+}
+
+.academic-empty {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  color: #4b5563;
+}
+
+.academic-timeline,
+.academic-timeline ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.academic-year {
+  margin-top: 1.25rem;
+}
+
+.academic-year h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+/* 연도 아래 세로선 + 항목마다 점 */
+.academic-year > ol {
+  border-left: 2px solid #e5e7eb;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.academic-year > ol > li {
+  position: relative;
+}
+
+.academic-year > ol > li::before {
+  content: '';
+  position: absolute;
+  left: calc(-1rem - 6px);
+  top: 1rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #9ca3af;
+}
+
+.academic-change {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.academic-change.mine {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+.academic-change h3 {
+  margin: 0.25rem 0;
+  font-size: 1rem;
+}
+
+.academic-change p {
+  margin: 0 0 0.5rem;
+  color: #374151;
+}
+
+.academic-change-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.academic-badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.academic-badge.mine {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.academic-source {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .academic-semester {
+    grid-template-columns: 1fr;
+  }
+}
