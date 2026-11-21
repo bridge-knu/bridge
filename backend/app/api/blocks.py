@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends
+"""블록 학습 API. 블록 내용은 content/blocks.json, 완료 여부는 plan_blocks에 저장한다."""
 
+from fastapi import APIRouter, Depends
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.clock import today
 from app.api.diagnosis import question_out
 from app.api.errors import ApiError, responses
-from app.api.mock_data import BLOCK_BY_ID, BLOCKS, CONCEPT_NAME, QUESTION_BY_ID, UserState, current_user
 from app.api.schemas import (
     BlockDetail,
     CompleteRequest,
@@ -14,41 +14,48 @@ from app.api.schemas import (
     Practice,
     Video,
 )
+from app.clock import now
+from app.content import get_graph
 from app.db import get_db
-from app.models import CodeSnapshot, User
+from app.engine.models import Block
+from app.models import CodeSnapshot, PlanBlock, User
 
 router = APIRouter(prefix="/blocks", tags=["blocks"])
 
 NOT_FOUND = responses("BLOCK_NOT_FOUND")
 
 
-def get_block_or_404(block_id: str) -> dict:
-    block = BLOCK_BY_ID.get(block_id)
+def get_block_or_404(block_id: str) -> Block:
+    block = get_graph().blocks.get(block_id)
     if block is None:
         raise ApiError("BLOCK_NOT_FOUND")
     return block
 
 
+def plan_rows(db: Session, user_id: int) -> list[PlanBlock]:
+    stmt = select(PlanBlock).where(PlanBlock.user_id == user_id).order_by(PlanBlock.date, PlanBlock.order)
+    return list(db.scalars(stmt).all())
+
+
 @router.get("/{block_id}", response_model=BlockDetail, responses=NOT_FOUND, summary="강의 링크·실습·확인 문제")
-def get_block(
-    block_id: str,
-    user: UserState = Depends(current_user),
-    account: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
+def get_block(block_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    graph = get_graph()
     b = get_block_or_404(block_id)
-    saved = db.get(CodeSnapshot, (account.id, block_id))
+    saved = db.get(CodeSnapshot, (user.id, block_id))
+    done = db.scalar(
+        select(PlanBlock.id).where(PlanBlock.user_id == user.id, PlanBlock.block_id == block_id, PlanBlock.done)
+    )
     return BlockDetail(
-        id=b["id"],
-        concept_id=b["concept"],
-        concept_name=CONCEPT_NAME[b["concept"]],
-        minutes=b["minutes"],
-        video=Video(**b["video"]),
-        practice=Practice(**b["practice"]),
-        check_questions=[question_out(q) for q in b["check"]],
+        id=b.id,
+        concept_id=b.concept,
+        concept_name=graph.concepts[b.concept].name,
+        minutes=b.minutes,
+        video=Video(url=b.video, start=b.video_start, end=b.video_end),
+        practice=Practice(lang=b.practice.lang, starter=b.practice.starter, expected=b.practice.expected),
+        check_questions=[question_out(graph, q) for q in b.check],
         saved_code=saved.code if saved else None,
         saved_at=saved.updated_at if saved else None,
-        done=block_id in user.done_blocks,
+        done=done is not None,
     )
 
 
@@ -57,25 +64,38 @@ def get_block(
     response_model=CompleteResponse,
     responses=NOT_FOUND,
     summary="블록 완료 처리",
-    description="확인 문제 답을 함께 보내면 채점한다. 틀려도 완료로 처리한다.",
+    description=(
+        "확인 문제 답을 함께 보내면 채점한다. 틀려도 완료로 처리한다. "
+        "nextBlockId는 플랜에서 이 블록 다음의 아직 안 끝낸 블록 (없으면 null)."
+    ),
 )
 def complete(
     block_id: str,
     body: CompleteRequest | None = None,
-    user: UserState = Depends(current_user),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    graph = get_graph()
     b = get_block_or_404(block_id)
     answers = {a.question_id: a.choice for a in (body.check_answers if body else [])}
-    correct = sum(1 for q in b["check"] if answers.get(q) == QUESTION_BY_ID[q]["answer"])
-    user.done_blocks.add(block_id)
-    user.done_dates.setdefault(block_id, today())
+    correct = sum(1 for q in b.check if answers.get(q) == graph.questions[q].answer)
 
-    ids = [x["id"] for x in BLOCKS]
-    rest = [i for i in ids[ids.index(block_id) + 1 :] if i not in user.done_blocks]
+    # 처음 끝낸 시각만 남긴다 (오늘 남은 시간 계산용)
+    db.execute(
+        update(PlanBlock)
+        .where(PlanBlock.user_id == user.id, PlanBlock.block_id == block_id, PlanBlock.done.is_(False))
+        .values(done=True, done_at=now())
+    )
+    db.commit()
+
+    ids = [r.block_id for r in plan_rows(db, user.id)]
+    done_ids = {r.block_id for r in plan_rows(db, user.id) if r.done}
+    after = ids[ids.index(block_id) + 1 :] if block_id in ids else ids
+    rest = [i for i in after if i not in done_ids]
     return CompleteResponse(
         block_id=block_id,
         done=True,
         correct_count=correct,
-        total_count=len(b["check"]),
+        total_count=len(b.check),
         next_block_id=rest[0] if rest else None,
     )

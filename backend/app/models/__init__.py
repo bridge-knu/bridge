@@ -107,6 +107,30 @@ class PlanBlock(Base):
     order: Mapped[int] = mapped_column(Integer)
     block_id: Mapped[str] = mapped_column(ID)
     done: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    done_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # 오늘 남은 시간 계산용
+
+
+class PlanInfo(Base):
+    """플랜 한 벌의 정보. 사용자당 1개. 없으면 GET /plan이 플랜을 새로 만든다.
+
+    프로필을 바꾸거나 진단을 다시 끝내면 지워서, 다음 GET /plan에서 새 값으로 다시 만들게 한다.
+    """
+
+    __tablename__ = "plan_infos"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    deferred: Mapped[list] = mapped_column(JSONB, server_default="[]")  # 미룬 개념 [{concept_id, concept_name, blocks}]
+    created_at: Mapped[dt.datetime] = created_now()
+
+
+class DiagnosisSession(Base):
+    """진행 중이거나 마지막으로 끝낸 진단의 엔진 상태 (DiagnosisState.to_dict()). 사용자당 1개."""
+
+    __tablename__ = "diagnosis_sessions"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    state: Mapped[dict] = mapped_column(JSONB)
+    updated_at: Mapped[dt.datetime] = updated_now()
 
 
 class CodeSnapshot(Base):

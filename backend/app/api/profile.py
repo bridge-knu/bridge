@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app import models
 from app.api.deps import get_current_user
-from app.api.mock_data import now
+from app.clock import now
 from app.api.schemas import Profile, ProfileResponse
 from app.db import get_db
 
@@ -25,7 +26,7 @@ def load_profile(db: Session, user_id: int) -> Profile | None:
     "/profile",
     response_model=ProfileResponse,
     summary="이수 과목·공백·복학일·하루 시간 저장",
-    description="사용자당 1개. 다시 저장하면 덮어쓴다.",
+    description="사용자당 1개. 다시 저장하면 덮어쓰고, 다음 GET /plan에서 플랜을 새 값으로 다시 만든다.",
 )
 def save_profile(
     body: Profile,
@@ -40,5 +41,7 @@ def save_profile(
         set_={**values, "updated_at": saved_at},
     )
     db.execute(stmt)
+    # 복학일·하루 시간이 바뀌었을 수 있으니 다음 GET /plan에서 플랜을 다시 만든다
+    db.execute(delete(models.PlanInfo).where(models.PlanInfo.user_id == user.id))
     db.commit()
     return ProfileResponse(**values, updated_at=saved_at)

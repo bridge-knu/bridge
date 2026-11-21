@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.blocks import NOT_FOUND, get_block_or_404
 from app.api.deps import get_current_user
-from app.api.mock_data import now
+from app.clock import now
 from app.api.schemas import CodeSaveRequest, CodeSaveResponse
 from app.db import get_db
 from app.models import CodeSnapshot, User

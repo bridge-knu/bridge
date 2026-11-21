@@ -10,3 +10,8 @@ KST = timezone(timedelta(hours=9), "KST")
 
 def today() -> date:
     return datetime.now(KST).date()
+
+
+def now() -> datetime:
+    """저장용 현재 시각 (UTC, 시간대 포함)."""
+    return datetime.now(timezone.utc)

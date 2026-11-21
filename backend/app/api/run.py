@@ -7,10 +7,10 @@ from redis import Redis
 from app import rate_limit, run_queue
 from app.api.blocks import get_block_or_404
 from app.api.deps import get_current_user
-from app.api.mock_data import BLOCK_BY_ID
 from app.api.errors import ApiError, responses
 from app.api.schemas import RunAccepted, RunRequest, RunResult
 from app.login_lock import get_redis
+from app.content import get_graph
 from app.models import User
 
 router = APIRouter(prefix="/run", tags=["run"])
@@ -97,9 +97,9 @@ def result(job_id: str, user: User = Depends(get_current_user), r: Redis = Depen
 
     out = job["result"]
     matches = None
-    block = BLOCK_BY_ID.get(job["blockId"]) if job["blockId"] else None
+    block = get_graph().blocks.get(job["blockId"]) if job["blockId"] else None
     if block is not None:
-        expected = block["practice"]["expected"]
+        expected = block.practice.expected
         matches = (
             out["exitCode"] == 0
             and not out["timedOut"]
