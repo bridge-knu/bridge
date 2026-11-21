@@ -274,6 +274,36 @@ def test_saved_code_is_per_user(client, login):
     assert other["savedCode"] is None
 
 
+def test_save_code_rejects_nul_character(client, db):
+    # PostgreSQL은 NUL 문자를 저장할 수 없다. 500 대신 422 JSON으로 거부해야 화면이 재시도하지 않는다
+    r = client.put("/code/b-array-1", json={"code": "int main(){}\u0000"})
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/json")
+    assert db.get(CodeSnapshot, (user_id(db), "b-array-1")) is None
+
+
+def test_save_code_keeps_other_special_characters(client):
+    code = 'printf("탭\t줄바꿈\n이모지 😀 백슬래시 \\\\");'
+    client.put("/code/b-array-1", json={"code": code})
+    assert client.get("/blocks/b-array-1").json()["savedCode"] == code
+
+
+def test_save_code_needs_login(api_client):
+    r = api_client.put("/code/b-array-1", json={"code": "x"})
+    assert r.status_code == 401
+    assert r.json()["code"] == "UNAUTHORIZED"
+
+
+def test_save_code_too_long_is_422(client):
+    assert client.put("/code/b-array-1", json={"code": "a" * 65537}).status_code == 422
+    assert client.put("/code/b-array-1", json={"code": "a" * 65536}).status_code == 200
+
+
+def test_save_code_unknown_block_has_code(client):
+    r = client.put("/code/nope", json={"code": "x"})
+    assert r.json() == {"detail": "블록을 찾을 수 없어요", "code": "BLOCK_NOT_FOUND"}
+
+
 def test_complete_block(client):
     r = client.post("/blocks/b-array-1/complete", json={"checkAnswers": [{"questionId": "q-array-2", "choice": 1}]})
     body = r.json()

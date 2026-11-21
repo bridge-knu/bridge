@@ -57,6 +57,15 @@ def test_wrong_pin(api_client):
     assert r.json() == WRONG_PIN
 
 
+@pytest.mark.parametrize("login_id", ["kim\u0000", "kim\nlee", "\ttab", "del\u007f"])
+def test_login_id_rejects_control_characters(api_client, login_id):
+    assert post_login(api_client, login_id, "1234").status_code == 422
+
+
+def test_login_id_allows_korean_and_symbols(api_client):
+    assert post_login(api_client, "상민_kim-01", "1234").status_code == 200
+
+
 @pytest.mark.parametrize("pin", ["123", "12345", "abcd"])
 def test_pin_must_be_4_digits(api_client, pin):
     assert post_login(api_client, "kim", pin).status_code == 422
