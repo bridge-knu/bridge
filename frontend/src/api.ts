@@ -28,6 +28,9 @@ export type ApiErrorCode =
   | 'DIAGNOSIS_FINISHED'
   | 'QUESTION_MISMATCH'
   | 'DIAGNOSIS_NOT_FINISHED'
+  | 'BLOCK_NOT_FOUND'
+  | 'JOB_NOT_FOUND'
+  | 'SERVICE_UNAVAILABLE'
 
 // 실패 응답. 백엔드가 { "detail": "..." } 형태로 보낸 안내 문구는 detail과 message에 담긴다.
 // 예) 401 { "detail": "아이디 또는 PIN이 틀렸어요" }, 429 { "detail": "1분 후 다시 시도해 주세요" }
@@ -238,30 +241,117 @@ export function getPlan() {
 }
 
 // ---- 블록 학습 ----
+// 타입은 backend/app/api/schemas.py의 BlockDetail·CompleteRequest·CompleteResponse·
+// CodeSaveRequest·CodeSaveResponse·RunRequest·RunAccepted·RunResult를 따른다.
 
-/** GET /blocks/{id}: 강의 링크·실습·확인 문제 */
+export type PracticeLang = 'c' | 'python'
+
+export interface BlockVideo {
+  url: string
+  /** 초 */
+  start: number
+  /** 초 */
+  end: number
+}
+
+export interface BlockPractice {
+  lang: PracticeLang
+  /** 에디터 초기 코드 */
+  starter: string
+  /** 정답 코드를 실행했을 때의 표준 출력 */
+  expected: string
+}
+
+export interface BlockDetail {
+  id: string
+  conceptId: string
+  conceptName: string
+  minutes: number
+  video: BlockVideo
+  practice: BlockPractice
+  /** 확인 문제. 정답은 내려오지 않는다 (채점은 POST /blocks/{id}/complete) */
+  checkQuestions: QuestionOut[]
+  /** 마지막으로 저장된 코드. 없으면 null */
+  savedCode: string | null
+  /** 저장 시각 (ISO 8601). 없으면 null */
+  savedAt: string | null
+  done: boolean
+}
+
+export interface CheckAnswer {
+  questionId: string
+  /** choices의 0부터 시작하는 인덱스 */
+  choice: number
+}
+
+export interface CompleteRequest {
+  checkAnswers: CheckAnswer[]
+}
+
+export interface CompleteResponse {
+  blockId: string
+  done: boolean
+  correctCount: number
+  totalCount: number
+  nextBlockId: string | null
+}
+
+export interface CodeSaveResponse {
+  blockId: string
+  /** 저장 시각 (ISO 8601) */
+  updatedAt: string
+}
+
+/** GET /blocks/{id}: 강의 링크·실습·확인 문제·저장된 코드 */
 export function getBlock(blockId: string) {
-  return request<unknown>('GET', `/blocks/${encodeURIComponent(blockId)}`)
+  return request<BlockDetail>('GET', `/blocks/${encodeURIComponent(blockId)}`)
 }
 
-/** POST /blocks/{id}/complete: 블록 완료 처리 */
-export function completeBlock(blockId: string) {
-  return request<unknown>('POST', `/blocks/${encodeURIComponent(blockId)}/complete`)
+/**
+ * POST /blocks/{id}/complete: 블록 완료 처리.
+ * 확인 문제 답을 함께 보내면 서버가 채점한다. 틀려도 완료로 처리된다.
+ */
+export function completeBlock(blockId: string, body: CompleteRequest) {
+  return request<CompleteResponse>('POST', `/blocks/${encodeURIComponent(blockId)}/complete`, body)
 }
 
-/** PUT /code/{blockId}: 코드 자동 저장 */
+/** PUT /code/{blockId}: 코드 자동 저장 (블록당 1개, 덮어쓰기). 코드는 최대 65536자 */
 export function saveCode(blockId: string, code: string) {
-  return request<unknown>('PUT', `/code/${encodeURIComponent(blockId)}`, { code })
+  return request<CodeSaveResponse>('PUT', `/code/${encodeURIComponent(blockId)}`, { code })
 }
 
 // ---- 코드 실행 ----
 
-/** POST /run: 코드 실행 요청 → jobId */
-export function runCode(payload: unknown) {
-  return request<unknown>('POST', '/run', payload)
+export interface RunRequest {
+  lang: PracticeLang
+  code: string
+  stdin?: string
+  /** 블록 실습이면 넣는다. 서버가 정답 출력과 비교한다 */
+  blockId?: string | null
 }
 
-/** GET /run/{jobId}: 실행 결과 (출력, 에러, 시간 초과) */
+export interface RunAccepted {
+  jobId: string
+}
+
+export interface RunResult {
+  jobId: string
+  status: 'queued' | 'running' | 'done'
+  stdout: string
+  stderr: string
+  exitCode: number | null
+  timedOut: boolean
+  durationMs: number | null
+  /** blockId를 보냈고 실행이 끝났을 때만 true/false, 그 밖에는 null */
+  matchesExpected: boolean | null
+}
+
+/** POST /run: 코드 실행 요청 → jobId (202) */
+export function runCode(payload: RunRequest) {
+  return request<RunAccepted>('POST', '/run', payload)
+}
+
+/** GET /run/{jobId}: 실행 결과. status가 done이 될 때까지 0.5초마다 부른다 */
 export function getRunResult(jobId: string) {
-  return request<unknown>('GET', `/run/${encodeURIComponent(jobId)}`)
+  return request<RunResult>('GET', `/run/${encodeURIComponent(jobId)}`)
 }
