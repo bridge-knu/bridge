@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.api import mock_data, run
+from app.clock import today
 from app.models import CodeSnapshot, Profile, User
 
 
@@ -191,9 +192,9 @@ def test_plan_has_no_deferred_when_time_is_enough(client):
 
 
 def test_plan_defers_concepts_when_time_is_short(client):
-    from datetime import date, timedelta
+    from datetime import timedelta
 
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    tomorrow = (today() + timedelta(days=1)).isoformat()
     client.put("/profile", json={**PROFILE, "returnDate": tomorrow, "dailyMinutes": 30})  # 블록 1개만 가능
     plan = client.post("/plan/generate").json()
     assert [b["blockId"] for d in plan["days"] for b in d["blocks"]] == ["b-array-1"]
@@ -202,6 +203,31 @@ def test_plan_defers_concepts_when_time_is_short(client):
         {"conceptId": "linked_list", "conceptName": "연결 리스트", "blocks": 1},
     ]
     assert plan["message"] == "시간이 부족해 포인터, 연결 리스트은(는) 복학 후로 미뤘어요"
+
+
+def test_plan_today_is_korean_date(client):
+    from datetime import datetime, timedelta, timezone
+
+    plan = client.get("/plan").json()
+    assert plan["today"] == today().isoformat()
+    assert today() == (datetime.now(timezone.utc) + timedelta(hours=9)).date()
+    assert plan["days"][0]["date"] == plan["today"]
+
+
+def test_today_remaining_is_daily_minus_done_today(client):
+    client.put("/profile", json={**PROFILE, "dailyMinutes": 90})
+    assert client.post("/plan/generate").json()["todayRemainingMinutes"] == 90
+    client.post("/blocks/b-array-1/complete")
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 60
+    client.post("/blocks/b-array-1/complete")  # 같은 블록을 다시 완료해도 두 번 빼지 않는다
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 60
+
+
+def test_today_remaining_never_negative(client):
+    client.put("/profile", json={**PROFILE, "dailyMinutes": 30})
+    client.post("/blocks/b-array-1/complete")
+    client.post("/blocks/b-pointer-1/complete")
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 0
 
 
 def test_plan_without_profile(client):

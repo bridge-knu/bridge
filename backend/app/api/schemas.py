@@ -134,9 +134,12 @@ class DeferredConcept(CamelModel):
 
 
 class Plan(CamelModel):
+    today: date = Field(description="서버 기준 오늘 날짜 (한국 시간). 화면은 브라우저 날짜 대신 이 값을 쓴다")
     return_date: date
     daily_minutes: int
-    today_remaining_minutes: int
+    today_remaining_minutes: int = Field(
+        description="오늘 공부할 수 있는 남은 시간(분) = 하루 가용 시간 - 오늘 완료한 블록 시간 (최소 0)"
+    )
     days: list[PlanDay]
     deferred_concepts: list[DeferredConcept] = Field(default_factory=list)
     message: str | None = Field(

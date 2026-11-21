@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.clock import today
 from app.api.diagnosis import question_out
 from app.api.errors import ApiError, responses
 from app.api.mock_data import BLOCK_BY_ID, BLOCKS, CONCEPT_NAME, QUESTION_BY_ID, UserState, current_user
@@ -67,6 +68,7 @@ def complete(
     answers = {a.question_id: a.choice for a in (body.check_answers if body else [])}
     correct = sum(1 for q in b["check"] if answers.get(q) == QUESTION_BY_ID[q]["answer"])
     user.done_blocks.add(block_id)
+    user.done_dates.setdefault(block_id, today())
 
     ids = [x["id"] for x in BLOCKS]
     rest = [i for i in ids[ids.index(block_id) + 1 :] if i not in user.done_blocks]

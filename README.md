@@ -97,6 +97,11 @@ docs/           개발 문서
 - 저장한 코드는 `GET /blocks/{blockId}`의 `savedCode`, `savedAt`으로 돌아옵니다.
 - `GET /plan`의 `dailyMinutes`, `returnDate`도 저장된 프로필을 씁니다.
 
+### 플랜의 날짜와 남은 시간
+
+- 날짜는 모두 **한국 시간** 기준입니다. 응답의 `today`가 서버 기준 오늘 날짜이니, 화면은 브라우저 날짜 대신 이 값을 쓰세요.
+- `todayRemainingMinutes` = 하루 가용 시간 − 오늘 완료한 블록 시간 (최소 0). "이 블록까지 가능"은 안 끝낸 블록 시간을 순서대로 더해서 이 값 안에 드는 데까지입니다.
+
 ### 플랜의 미룬 개념
 
 복학일까지 시간이 부족하면 `POST /plan/generate`, `GET /plan` 응답의 `deferredConcepts`에 복학 후로 미룬 개념(`conceptId`, `conceptName`, `blocks`)이, `message`에 안내 문구가 옵니다. 미룬 개념이 없으면 `[]`와 `null`입니다. mock에서는 프로필의 복학일을 내일, 하루 30분으로 저장하면 확인할 수 있습니다.

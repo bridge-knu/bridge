@@ -1,12 +1,13 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.mock_data import BLOCKS, CONCEPT_NAME, UserState, current_user
+from app.api.mock_data import BLOCK_BY_ID, BLOCKS, CONCEPT_NAME, UserState, current_user
 from app.api.profile import load_profile
 from app.api.schemas import DeferredConcept, Plan, PlanBlock, PlanDay, Profile
+from app.clock import today
 from app.db import get_db
 from app.models import User
 
@@ -14,12 +15,13 @@ router = APIRouter(prefix="/plan", tags=["plan"])
 
 
 def build_plan(user: UserState, profile: Profile | None) -> Plan:
+    now = today()
     daily = profile.daily_minutes if profile else 60
-    return_date = profile.return_date if profile else date.today() + timedelta(days=90)
+    return_date = profile.return_date if profile else now + timedelta(days=90)
     per_day = max(1, daily // 30)
 
     # 엔진과 같은 규칙: 복학 전날까지 쓸 수 있는 블록 수를 넘으면 뒤쪽 개념부터 미룬다
-    budget = max((return_date - date.today()).days, 0) * per_day
+    budget = max((return_date - now).days, 0) * per_day
     planned, deferred = BLOCKS[:budget], BLOCKS[budget:]
 
     days: list[PlanDay] = []
@@ -27,7 +29,7 @@ def build_plan(user: UserState, profile: Profile | None) -> Plan:
         chunk = planned[i : i + per_day]
         days.append(
             PlanDay(
-                date=date.today() + timedelta(days=len(days)),
+                date=now + timedelta(days=len(days)),
                 blocks=[
                     PlanBlock(
                         order=n,
@@ -42,13 +44,16 @@ def build_plan(user: UserState, profile: Profile | None) -> Plan:
             )
         )
 
-    today_left = sum(b.minutes for b in days[0].blocks if not b.done) if days else 0
+    # 오늘 공부할 수 있는 남은 시간 = 하루 가용 시간 - 오늘 완료한 블록 시간
+    done_today = sum(BLOCK_BY_ID[b]["minutes"] for b, d in user.done_dates.items() if d == now)
+    today_left = max(daily - done_today, 0)
     deferred_concepts = [
         DeferredConcept(concept_id=b["concept"], concept_name=CONCEPT_NAME[b["concept"]], blocks=1)
         for b in deferred
     ]
     names = ", ".join(d.concept_name for d in deferred_concepts)
     return Plan(
+        today=now,
         return_date=return_date,
         daily_minutes=daily,
         today_remaining_minutes=today_left,
