@@ -37,9 +37,13 @@ def g():
     ]))
 
 
-def test_sample_content_loads():
+def test_content_loads():
     graph = load_graph(CONTENT_DIR)
-    assert graph.topological_order() == ["array", "pointer", "linked_list"]
+    order = graph.topological_order()
+    assert order[0] == "variable"
+    for cid in order:
+        for p in graph.prereqs(cid):
+            assert order.index(p) < order.index(cid)
 
 
 def test_topological_order_puts_prereqs_first(g):
