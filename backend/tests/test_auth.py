@@ -10,9 +10,9 @@ from app.models import User
 from app.main import app
 from app.security import JWT_ALGORITHM, JwtSecretError, jwt_secret, verify_pin
 
-WRONG_PIN = {"detail": "아이디 또는 PIN이 틀렸어요"}
-LOCKED = {"detail": "1분 후 다시 시도해 주세요"}
-UNAUTHORIZED = {"detail": "다시 로그인해 주세요"}
+WRONG_PIN = {"detail": "아이디 또는 PIN이 틀렸어요", "code": "WRONG_PIN"}
+LOCKED = {"detail": "1분 후 다시 시도해 주세요", "code": "LOGIN_LOCKED"}
+UNAUTHORIZED = {"detail": "다시 로그인해 주세요", "code": "UNAUTHORIZED"}
 
 
 def post_login(client, login_id, pin):
@@ -196,3 +196,34 @@ def test_server_does_not_start_with_unsafe_secret(monkeypatch):
     with pytest.raises(JwtSecretError):
         with TestClient(app):
             pass
+
+
+# ---- DB·Redis 장애 ----
+
+
+def test_redis_down_is_503(api_client):
+    from redis import Redis
+
+    down = Redis.from_url("redis://localhost:1/0", socket_connect_timeout=0.2)
+    app.dependency_overrides[login_lock.get_redis] = lambda: down
+    r = post_login(api_client, "kim", "1234")
+    assert r.status_code == 503
+    assert r.json() == {"detail": "잠시 후 다시 시도해 주세요", "code": "SERVICE_UNAVAILABLE"}
+
+
+def test_db_down_is_503(api_client):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.db import get_db
+
+    down = create_engine("postgresql+psycopg://x:x@localhost:1/x", connect_args={"connect_timeout": 1})
+
+    def broken_db():
+        with Session(down) as s:
+            yield s
+
+    app.dependency_overrides[get_db] = broken_db
+    r = post_login(api_client, "kim", "1234")
+    assert r.status_code == 503
+    assert r.json()["code"] == "SERVICE_UNAVAILABLE"

@@ -138,6 +138,7 @@ def now() -> datetime:
 @dataclass
 class UserState:
     diagnosis_index: int = 0
+    diagnosis_done: bool = False
     plan_created: bool = False
     done_blocks: set[str] = field(default_factory=set)
 
