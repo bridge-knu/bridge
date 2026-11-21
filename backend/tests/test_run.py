@@ -139,14 +139,60 @@ def test_container_limits():
         assert flag in cmd
 
 
-def test_stale_job_is_reported_as_failed(client, fake_redis):
-    job_id = submit(client)
+def age_job(fake_redis, job_id, **seconds_ago):
     job = run_queue.load(fake_redis, job_id)
-    job["createdAt"] -= run.STALE_SECONDS + 1  # 워커가 죽어서 오래 대기 중인 상황
+    for key, ago in seconds_ago.items():
+        job[key] = job.get(key, job["createdAt"]) - ago
     run_queue.save(fake_redis, job)
+
+
+def test_stale_queued_job_is_reported_as_failed(client, fake_redis):
+    job_id = submit(client)
+    age_job(fake_redis, job_id, createdAt=run_queue.QUEUE_TIMEOUT_SECONDS + 1)  # 워커가 죽어서 오래 대기
     res = client.get(f"/run/{job_id}").json()
     assert res["status"] == "done"
     assert res["exitCode"] == 1
+
+
+def test_worker_skips_job_that_waited_too_long(client, fake_redis):
+    # 리뷰 M2: API가 실패로 알려 준 작업을 워커가 뒤늦게 실행하면 안 된다
+    job_id = submit(client)
+    age_job(fake_redis, job_id, createdAt=run_queue.QUEUE_TIMEOUT_SECONDS + 1)
+    work(fake_redis, lambda job: pytest.fail("실행하면 안 됨"))
+    res = client.get(f"/run/{job_id}").json()
+    assert res["status"] == "done"
+    assert res["stderr"] == run_queue.EXPIRED_MESSAGE
+    assert run_queue.load(fake_redis, job_id)["code"] == ""
+
+
+def test_running_job_judged_by_start_time(client, fake_redis):
+    # 오래 기다렸다가 방금 실행을 시작한 작업은 아직 실패가 아니다
+    job_id = submit(client)
+    job = run_queue.load(fake_redis, job_id)
+    job.update(status="running", createdAt=job["createdAt"] - 59, startedAt=job["createdAt"])
+    run_queue.save(fake_redis, job)
+    assert client.get(f"/run/{job_id}").json()["status"] == "running"
+    # 실행 시작 후 RUN_TIMEOUT이 지나면 실패
+    age_job(fake_redis, job_id, startedAt=run_queue.RUN_TIMEOUT_SECONDS + 1)
+    assert client.get(f"/run/{job_id}").json()["status"] == "done"
+
+
+def test_parse_result_ignores_injected_prefix():
+    # 리뷰 C1: 결과 앞에 다른 글자가 섞여도 runner.py의 마지막 결과만 본다
+    real = b'{"stdout": "15\\n", "stderr": "", "exitCode": 0, "timedOut": false, "durationMs": 3}'
+    assert worker.parse_result(b"garbage" + real)["stdout"] == "15\n"
+    assert worker.parse_result(b"no json here") is None
+    assert worker.parse_result(b'{"stdout": broken') is None
+
+
+def test_drain_stops_collecting_at_limit():
+    import io
+
+    called = []
+    chunks: list[bytes] = []
+    worker._drain(io.BytesIO(b"x" * 200_000), 100_000, chunks, lambda: called.append(1))
+    assert sum(len(c) for c in chunks) == 100_000
+    assert called  # 넘쳤으니 컨테이너를 지우도록 알림
 
 
 def test_runs_per_user_are_limited(client, login, monkeypatch):

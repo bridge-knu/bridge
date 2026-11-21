@@ -107,7 +107,20 @@ def execute(job: dict) -> dict:
     return result(read_capped("out.txt"), stderr, code, timed_out, duration)
 
 
+def harden() -> None:
+    """학생 프로그램이 /proc/1/fd/1 로 이 프로세스의 출력에 직접 써서 64KB 제한을 우회하지 못하게 한다.
+
+    학생 프로그램도 같은 사용자(1000)로 돌기 때문에 기본으로는 /proc/1/fd 에 접근할 수 있다.
+    dumpable을 끄면 /proc/1 아래가 root 소유가 되어 접근할 수 없다 (자식 프로세스에는 영향 없음).
+    """
+    import ctypes
+
+    PR_SET_DUMPABLE = 4
+    ctypes.CDLL(None).prctl(PR_SET_DUMPABLE, 0, 0, 0, 0)
+
+
 def main() -> None:
+    harden()
     job = json.load(sys.stdin)
     try:
         out = execute(job)

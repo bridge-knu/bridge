@@ -52,33 +52,105 @@ def failure(message: str) -> dict:
     return {"stdout": "", "stderr": message, "exitCode": 1, "timedOut": False, "durationMs": 0}
 
 
+# 컨테이너에서 받는 출력의 최대 크기. runner.py 결과 JSON은 출력 64KB × 2를 이스케이프해도 1MB 안에 든다.
+# 학생 코드가 제한을 우회해 대량으로 쓰더라도 워커 메모리를 채우지 못하게 이만큼만 읽고 컨테이너를 지운다.
+MAX_STDOUT_BYTES = 1024 * 1024
+MAX_STDERR_BYTES = 64 * 1024
+
+
+def _drain(stream, limit: int, chunks: list[bytes], on_overflow: Callable[[], None]) -> None:
+    """stream을 끝까지 읽되 limit까지만 모은다. 넘으면 on_overflow를 부른다."""
+    total = 0
+    while chunk := stream.read(65536):
+        if total < limit:
+            chunks.append(chunk[: limit - total])
+        total += len(chunk)
+        if total > limit:
+            on_overflow()
+
+
+def parse_result(raw: bytes) -> dict | None:
+    """runner.py가 마지막에 쓴 결과 JSON을 꺼낸다. 앞에 다른 글자가 섞여 있어도 마지막 결과만 본다."""
+    text = raw.decode("utf-8", errors="replace")
+    start = text.rfind('{"stdout"')
+    if start == -1:
+        return None
+    try:
+        result = json.loads(text[start:])
+    except ValueError:
+        return None
+    return result if isinstance(result, dict) else None
+
+
 def run_in_container(job: dict) -> dict:
     """샌드박스 컨테이너 하나로 작업을 실행하고 runner.py의 결과를 돌려준다."""
     name = f"bridge-run-{job['jobId']}"
     payload = json.dumps({"lang": job["lang"], "code": job["code"], "stdin": job.get("stdin", "")})
+
+    overflow = threading.Event()
+    removed = threading.Lock()
+
+    def remove_container() -> None:
+        if removed.acquire(blocking=False):  # 한 번만
+            subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+
+    def on_overflow() -> None:
+        if not overflow.is_set():
+            overflow.set()
+            remove_container()
+
+    proc = subprocess.Popen(
+        docker_command(name), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    out: list[bytes] = []
+    err: list[bytes] = []
+    readers = [
+        threading.Thread(target=_drain, args=(proc.stdout, MAX_STDOUT_BYTES, out, on_overflow), daemon=True),
+        threading.Thread(target=_drain, args=(proc.stderr, MAX_STDERR_BYTES, err, on_overflow), daemon=True),
+    ]
+    for t in readers:
+        t.start()
     try:
-        proc = subprocess.run(
-            docker_command(name), input=payload.encode(), capture_output=True, timeout=CONTAINER_TIMEOUT
-        )
-    except subprocess.TimeoutExpired:
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True)
-        return {**failure("시간 초과"), "exitCode": 124, "timedOut": True}
+        proc.stdin.write(payload.encode())
+        proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
 
     try:
-        return json.loads(proc.stdout)
-    except ValueError:
-        # runner.py가 결과를 못 내고 죽은 경우. 137은 메모리 초과로 컨테이너가 종료된 것
-        if proc.returncode == 137:
-            return {**failure("메모리 제한(128MB)을 넘어 강제 종료됐어요"), "exitCode": 137}
-        log.error("sandbox failed (%s): %s", proc.returncode, proc.stderr.decode(errors="replace")[-500:])
-        return failure("실행 환경 오류: 잠시 후 다시 시도해 주세요")
+        proc.wait(timeout=CONTAINER_TIMEOUT)
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        remove_container()
+        proc.wait()
+        timed_out = True
+    for t in readers:
+        t.join(timeout=5)
+
+    if overflow.is_set():
+        return failure("출력이 너무 많아 실행을 중단했어요 (최대 64KB)")
+    if timed_out:
+        return {**failure("시간 초과"), "exitCode": 124, "timedOut": True}
+
+    result = parse_result(b"".join(out))
+    if result is not None:
+        return result
+    # runner.py가 결과를 못 내고 죽은 경우. 137은 메모리 초과로 컨테이너가 종료된 것
+    if proc.returncode == 137:
+        return {**failure("메모리 제한(128MB)을 넘어 강제 종료됐어요"), "exitCode": 137}
+    log.error("sandbox failed (%s): %s", proc.returncode, b"".join(err).decode(errors="replace")[-500:])
+    return failure("실행 환경 오류: 잠시 후 다시 시도해 주세요")
 
 
 def process(r: Redis, job_id: str, execute: Callable[[dict], dict] = run_in_container) -> None:
     job = run_queue.load(r, job_id)
     if job is None:  # 1시간이 지나 지워진 작업
         return
-    job["status"] = "running"
+    if time.time() - job["createdAt"] > run_queue.QUEUE_TIMEOUT_SECONDS:
+        # 너무 오래 기다린 작업은 화면이 이미 실패로 보여 줬으므로 실행하지 않는다
+        job.update(status="done", result=failure(run_queue.EXPIRED_MESSAGE), code="")
+        run_queue.save(r, job)
+        return
+    job.update(status="running", startedAt=time.time())
     run_queue.save(r, job)
     try:
         outcome = execute(job)

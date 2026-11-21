@@ -111,7 +111,8 @@ docs/           개발 문서
 
 - 컴파일 에러는 `stderr`에 gcc 메시지가 그대로 오고 `exitCode`가 0이 아닙니다.
 - `blockId`를 보내면 블록의 정답 출력과 비교해서 `matchesExpected`를 줍니다 (줄 끝 공백·마지막 줄바꿈 차이는 무시).
-- 90초가 지나도 끝나지 않은 작업은 실패(`exitCode: 1`)로 돌려줍니다.
+- 대기열에서 60초 넘게 기다린 작업은 실행하지 않고, 실행을 시작하고 45초 안에 결과가 없는 작업은 실패(`exitCode: 1`)로 돌려줍니다.
+- 학생 코드가 실행기의 출력에 직접 쓰는 우회를 막았고, worker는 컨테이너 출력을 1MB까지만 받습니다. worker에는 Redis 주소만 넘깁니다 (DB 비밀번호·JWT 키 없음).
 - 결과는 1시간 동안 보관합니다.
 
 `docker compose up -d --build`를 하면 샌드박스 이미지 빌드와 worker 실행까지 같이 됩니다. worker는 호스트의 Docker(`/var/run/docker.sock`)로 컨테이너를 띄웁니다.

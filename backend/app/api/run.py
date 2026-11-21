@@ -19,8 +19,17 @@ router = APIRouter(prefix="/run", tags=["run"])
 MAX_QUEUE = 100
 # 한 사람이 실행 대기열을 독차지하지 못하게 한다 (1분에 20번)
 RUNS_PER_USER = (20, 60)
-# 워커가 죽는 등으로 이 시간 안에 끝나지 않은 작업은 실패로 돌려줘서 화면이 계속 기다리지 않게 한다
-STALE_SECONDS = 90
+
+
+def is_stale(job: dict, now: float) -> bool:
+    """워커가 죽는 등으로 끝나지 않을 작업인지. 맞으면 화면이 계속 기다리지 않게 실패로 돌려준다.
+
+    - 대기 중: 워커는 QUEUE_TIMEOUT보다 오래 기다린 작업을 실행하지 않으므로 그 뒤로는 실패
+    - 실행 중: 실행을 시작하고 RUN_TIMEOUT이 지나도 결과가 없으면 실패
+    """
+    if job["status"] == "queued":
+        return now - job["createdAt"] > run_queue.QUEUE_TIMEOUT_SECONDS
+    return now - job.get("startedAt", job["createdAt"]) > run_queue.RUN_TIMEOUT_SECONDS
 
 
 def normalize_output(text: str) -> str:
@@ -76,11 +85,11 @@ def result(job_id: str, user: User = Depends(get_current_user), r: Redis = Depen
     if job is None or job["userId"] != user.id:
         raise ApiError("JOB_NOT_FOUND")
     if job["status"] != "done":
-        if time.time() - job["createdAt"] > STALE_SECONDS:
+        if is_stale(job, time.time()):
             return RunResult(
                 job_id=job_id,
                 status="done",
-                stderr="실행이 너무 오래 걸려 중단됐어요. 다시 실행해 주세요",
+                stderr=run_queue.EXPIRED_MESSAGE,
                 exit_code=1,
                 matches_expected=False if job["blockId"] else None,
             )

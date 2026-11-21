@@ -96,3 +96,34 @@ def test_memory_bomb_is_killed():
 def test_segfault_message():
     out = run("c", "int main(){ int *p = 0; *p = 1; }")
     assert "Segmentation fault" in out["stderr"]
+
+
+def test_cannot_write_to_runner_stdout():
+    # 리뷰 C1: /proc/1/fd/1(러너의 출력)에 직접 써서 64KB 제한을 우회하는 공격
+    code = (
+        "import os\n"
+        "try:\n"
+        "    fd = os.open('/proc/1/fd/1', os.O_WRONLY)\n"
+        "except OSError:\n"
+        "    print('blocked')\n"
+        "else:\n"
+        "    for _ in range(2000):\n"
+        "        os.write(fd, b'X' * 65536)\n"
+        "    print('wrote')\n"
+    )
+    out = run("python", code)
+    assert out["stdout"] == "blocked\n"
+
+
+def test_cannot_read_runner_memory_or_environment():
+    code = (
+        "for p in ['/proc/1/environ', '/proc/1/mem', '/proc/1/cmdline']:\n"
+        "    try:\n"
+        "        open(p, 'rb').read(1)\n"
+        "        print(p, 'open')\n"
+        "    except OSError:\n"
+        "        print(p, 'blocked')\n"
+    )
+    out = run("python", code)
+    assert "/proc/1/environ blocked" in out["stdout"]
+    assert "/proc/1/mem blocked" in out["stdout"]
