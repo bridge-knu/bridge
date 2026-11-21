@@ -45,7 +45,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await login(id, pin)
-      // 토큰은 api.ts의 메모리에만 둔다 (브라우저 저장소에 저장하지 않음)
+      // 토큰은 api.ts가 sessionStorage에 둔다 (새로고침해도 유지, 탭을 닫으면 지워짐)
       setAuthToken(res.token)
       // 새 사용자는 프로필 입력부터, 기존 사용자는 플랜으로
       navigate(res.isNewUser ? '/profile' : '/plan', { replace: true })
