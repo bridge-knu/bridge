@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": "knu-retake-policy-2024",
+    "effectiveDate": "2024-03-01",
+    "admissionYearFrom": null,
+    "admissionYearTo": null,
+    "title": "재이수 및 성적 평가 기준 변경",
+    "summary": "2024학년도 1학기부터 학기당 재이수 가능 학점이 6학점에서 9학점으로 확대되고, 재이수 가능 교과목의 종전 성적 기준이 C+에서 B-로 변경됐습니다. 재이수 교과목의 성적 취득 상한도 B+에서 A-로 변경됐습니다. 상대평가 권장과목의 A등급 비율은 40%에서 50%로 변경됐습니다.",
+    "sourceUrl": "https://see.knu.ac.kr/mobile/content/notice.html?fidx=102517"
+  },
+  {
+    "id": "cse-curriculum-equivalent-2026",
+    "effectiveDate": "2026-03-01",
+    "admissionYearFrom": null,
+    "admissionYearTo": null,
+    "title": "신설 전공 교육과정에 따른 동일과목 지정",
+    "summary": "심화컴퓨팅전공과 첨단컴퓨팅연구전공의 신설 교육과정에 따라 기존 교과목과 신교과목의 동일과목 지정 현황이 안내됐습니다. 학년별 적용 시점은 1학년 2026학년도 1학기, 2학년 2027학년도 1학기, 3학년 2028학년도 1학기, 4학년 2029학년도 1학기입니다. 동일 과목 수강 시 재이수 처리에 유의해야 합니다.",
+    "sourceUrl": "https://cse.knu.ac.kr/bbs/board.php?bo_table=sub6_1_a&page=1&sca=%ED%95%99%EC%82%AC&sfl=wr_subject&sod=desc&sop=and&sst=wr_datetime&stx=%EB%8F%99%EC%9D%BC&wr_id=29080"
+  },
+  {
+    "id": "knu-ai-college-record-2027",
+    "effectiveDate": "2027-03-01",
+    "admissionYearFrom": null,
+    "admissionYearTo": null,
+    "title": "AI대학 설치에 따른 학적정보 변경 예정",
+    "summary": "AI대학 설치에 따라 기존 IT대 컴퓨터학부 재적생의 학적정보가 AI대학 및 전공정보 기준으로 일괄 변경될 예정입니다. 적용 예정일은 2027년 3월 1일이며, 세부 변경 사항은 학부의 후속 안내를 확인해야 합니다.",
+    "sourceUrl": "https://cse.knu.ac.kr/bbs/board.php?bo_table=sub6_1_a&page=455&sod=desc&sop=and&sst=wr_hit&wr_id=29441"
+  }
+]
