@@ -8,7 +8,7 @@ DB(A2)와 엔진(A7)이 연결되면 이 파일은 지운다.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import Depends
 
@@ -137,12 +137,11 @@ def now() -> datetime:
 
 @dataclass
 class UserState:
-    profile: dict | None = None
     diagnosis_index: int = 0
     diagnosis_done: bool = False
     plan_created: bool = False
     done_blocks: set[str] = field(default_factory=set)
-    code: dict[str, tuple[str, datetime]] = field(default_factory=dict)
+    done_dates: dict[str, date] = field(default_factory=dict)  # 블록 id → 완료한 날짜 (KST)
 
 
 @dataclass

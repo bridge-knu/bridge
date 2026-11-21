@@ -8,7 +8,7 @@ from app import login_lock
 from app.api.errors import ApiError, responses
 from app.api.schemas import LoginRequest, LoginResponse
 from app.db import get_db
-from app.models import User
+from app.models import Profile, User
 from app.security import create_token, hash_pin, verify_pin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     responses=responses("WRONG_PIN", "LOGIN_LOCKED", "SERVICE_UNAVAILABLE"),
     summary="아이디 + PIN 로그인 (없는 아이디면 가입)",
     description=(
-        "없는 아이디면 그 PIN으로 가입하고 isNewUser=true. "
+        "없는 아이디면 그 PIN으로 가입한다. isNewUser는 프로필을 아직 입력하지 않았으면 true. "
         "같은 아이디로 PIN을 5번 틀리면 1분 동안 429. 데모 계정은 demo / 0000."
     ),
 )
@@ -49,4 +49,6 @@ def login(
         raise ApiError("WRONG_PIN")
 
     login_lock.clear_failures(r, body.login_id)
-    return LoginResponse(token=create_token(user.id), is_new_user=is_new)
+    # 가입만 하고 프로필 입력 전에 나간 사용자도 다시 프로필 화면으로 보낸다.
+    needs_profile = is_new or db.get(Profile, user.id) is None
+    return LoginResponse(token=create_token(user.id), is_new_user=needs_profile)

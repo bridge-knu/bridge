@@ -31,8 +31,14 @@ def test_new_id_signs_up(api_client, db):
     assert verify_pin("1234", user.pin_hash)
 
 
-def test_second_login_is_existing_user(api_client):
-    post_login(api_client, "kim", "1234")
+def test_is_new_user_until_profile_saved(api_client):
+    token = post_login(api_client, "kim", "1234").json()["token"]
+    # 가입만 하고 프로필 입력 전에 나갔다면 다시 프로필 화면으로
+    assert post_login(api_client, "kim", "1234").json()["isNewUser"] is True
+
+    profile = {"completedCourses": [], "gapMonths": 12, "targetCourse": "DS",
+               "returnDate": "2027-03-02", "dailyMinutes": 60}
+    api_client.put("/profile", json=profile, headers={"Authorization": f"Bearer {token}"})
     r = post_login(api_client, "kim", "1234")
     assert r.status_code == 200
     assert r.json()["isNewUser"] is False
@@ -49,6 +55,15 @@ def test_wrong_pin(api_client):
     r = post_login(api_client, "kim", "9999")
     assert r.status_code == 401
     assert r.json() == WRONG_PIN
+
+
+@pytest.mark.parametrize("login_id", ["kim\u0000", "kim\nlee", "\ttab", "del\u007f"])
+def test_login_id_rejects_control_characters(api_client, login_id):
+    assert post_login(api_client, login_id, "1234").status_code == 422
+
+
+def test_login_id_allows_korean_and_symbols(api_client):
+    assert post_login(api_client, "상민_kim-01", "1234").status_code == 200
 
 
 @pytest.mark.parametrize("pin", ["123", "12345", "abcd"])

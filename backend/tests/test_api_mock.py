@@ -1,8 +1,11 @@
 import time
 
 import pytest
+from sqlalchemy import select
 
 from app.api import mock_data, run
+from app.clock import today
+from app.models import CodeSnapshot, Profile, User
 
 
 @pytest.fixture
@@ -73,6 +76,31 @@ def test_profile_keeps_raw_grade(client):
     courses = [{"course": "C", "grade": "A+"}, {"course": "DS", "grade": "P"}]
     r = client.put("/profile", json={**PROFILE, "completedCourses": courses})
     assert r.json()["completedCourses"] == courses
+
+
+def user_id(db, login_id="tester"):
+    return db.scalar(select(User.id).where(User.login_id == login_id))
+
+
+def test_profile_is_saved_in_db(client, db):
+    client.put("/profile", json=PROFILE)
+    row = db.get(Profile, user_id(db))
+    assert row.gap_months == 24
+    assert row.completed_courses == [{"course": "C", "grade": "A+"}]
+    assert str(row.return_date) == "2027-03-02"
+
+
+def test_profile_save_overwrites(client, db):
+    first = client.put("/profile", json=PROFILE).json()
+    second = client.put("/profile", json={**PROFILE, "dailyMinutes": 120}).json()
+    assert second["dailyMinutes"] == 120
+    assert second["updatedAt"] > first["updatedAt"]
+    assert db.get(Profile, user_id(db)).daily_minutes == 120
+
+
+def test_demo_has_profile(api_client, db):
+    row = db.get(Profile, user_id(db, "demo"))
+    assert row is not None and row.target_course == "DS"
 
 
 # ---- 진단 ----
@@ -156,6 +184,52 @@ def test_plan_uses_daily_minutes(client):
     assert client.get("/plan").json() == plan
 
 
+def test_plan_has_no_deferred_when_time_is_enough(client):
+    client.put("/profile", json=PROFILE)
+    plan = client.post("/plan/generate").json()
+    assert plan["deferredConcepts"] == []
+    assert plan["message"] is None
+
+
+def test_plan_defers_concepts_when_time_is_short(client):
+    from datetime import timedelta
+
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+    client.put("/profile", json={**PROFILE, "returnDate": tomorrow, "dailyMinutes": 30})  # 블록 1개만 가능
+    plan = client.post("/plan/generate").json()
+    assert [b["blockId"] for d in plan["days"] for b in d["blocks"]] == ["b-array-1"]
+    assert plan["deferredConcepts"] == [
+        {"conceptId": "pointer", "conceptName": "포인터", "blocks": 1},
+        {"conceptId": "linked_list", "conceptName": "연결 리스트", "blocks": 1},
+    ]
+    assert plan["message"] == "시간이 부족해 포인터, 연결 리스트은(는) 복학 후로 미뤘어요"
+
+
+def test_plan_today_is_korean_date(client):
+    from datetime import datetime, timedelta, timezone
+
+    plan = client.get("/plan").json()
+    assert plan["today"] == today().isoformat()
+    assert today() == (datetime.now(timezone.utc) + timedelta(hours=9)).date()
+    assert plan["days"][0]["date"] == plan["today"]
+
+
+def test_today_remaining_is_daily_minus_done_today(client):
+    client.put("/profile", json={**PROFILE, "dailyMinutes": 90})
+    assert client.post("/plan/generate").json()["todayRemainingMinutes"] == 90
+    client.post("/blocks/b-array-1/complete")
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 60
+    client.post("/blocks/b-array-1/complete")  # 같은 블록을 다시 완료해도 두 번 빼지 않는다
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 60
+
+
+def test_today_remaining_never_negative(client):
+    client.put("/profile", json={**PROFILE, "dailyMinutes": 30})
+    client.post("/blocks/b-array-1/complete")
+    client.post("/blocks/b-pointer-1/complete")
+    assert client.get("/plan").json()["todayRemainingMinutes"] == 0
+
+
 def test_plan_without_profile(client):
     plan = client.get("/plan").json()
     assert len(plan["days"]) >= 1
@@ -198,6 +272,36 @@ def test_saved_code_is_per_user(client, login):
     other_token = login("other")
     other = client.get("/blocks/b-array-1", headers={"Authorization": f"Bearer {other_token}"}).json()
     assert other["savedCode"] is None
+
+
+def test_save_code_rejects_nul_character(client, db):
+    # PostgreSQL은 NUL 문자를 저장할 수 없다. 500 대신 422 JSON으로 거부해야 화면이 재시도하지 않는다
+    r = client.put("/code/b-array-1", json={"code": "int main(){}\u0000"})
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/json")
+    assert db.get(CodeSnapshot, (user_id(db), "b-array-1")) is None
+
+
+def test_save_code_keeps_other_special_characters(client):
+    code = 'printf("탭\t줄바꿈\n이모지 😀 백슬래시 \\\\");'
+    client.put("/code/b-array-1", json={"code": code})
+    assert client.get("/blocks/b-array-1").json()["savedCode"] == code
+
+
+def test_save_code_needs_login(api_client):
+    r = api_client.put("/code/b-array-1", json={"code": "x"})
+    assert r.status_code == 401
+    assert r.json()["code"] == "UNAUTHORIZED"
+
+
+def test_save_code_too_long_is_422(client):
+    assert client.put("/code/b-array-1", json={"code": "a" * 65537}).status_code == 422
+    assert client.put("/code/b-array-1", json={"code": "a" * 65536}).status_code == 200
+
+
+def test_save_code_unknown_block_has_code(client):
+    r = client.put("/code/nope", json={"code": "x"})
+    assert r.json() == {"detail": "블록을 찾을 수 없어요", "code": "BLOCK_NOT_FOUND"}
 
 
 def test_complete_block(client):
