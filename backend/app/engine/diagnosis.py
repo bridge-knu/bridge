@@ -64,9 +64,14 @@ class DiagnosisState:
 
 
 def diagnosable_concepts(graph: Graph, target_course: str) -> set[str]:
-    """진단 대상: 목표 과목을 듣는 데 필요한 개념 중 목표 과목 바깥의 선수 개념."""
-    return {c for c in graph.required_for_course(target_course)
-            if graph.concepts[c].course != target_course}
+    """진단 대상: 목표 과목을 듣는 데 필요한 개념 중 목표 과목 바깥의 선수 개념.
+
+    목표 과목에 바깥 선수 개념이 없으면(예: 목표가 C) 목표 과목 개념 자체를 진단한다.
+    처음 배우거나 재수강하는 학생이 어디까지 아는지 확인하기 위해서다.
+    """
+    required = graph.required_for_course(target_course)
+    outside = {c for c in required if graph.concepts[c].course != target_course}
+    return outside or required
 
 
 def start_diagnosis(profile: Profile | dict, graph: Graph,
