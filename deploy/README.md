@@ -46,6 +46,25 @@ cd deploy && docker compose up -d --build
 
 DB 마이그레이션은 backend가 시작할 때 자동으로 적용된다. 업데이트 후에는 데모 계정(`demo` / `0000`)으로 데모 시나리오를 한 번 끝까지 돌려 본다.
 
+## DB 백업
+
+데모 데이터라도 서버가 망가지면 복구할 수 있게 하루 한 번 백업한다. 서버에서 한 번만 실행:
+
+```bash
+mkdir -p ~/backups
+(crontab -l 2>/dev/null; echo '0 4 * * * cd ~/bridge/deploy && docker compose exec -T db pg_dump -U bridge bridge | gzip > ~/backups/bridge-$(date +\%F).sql.gz && find ~/backups -mtime +7 -delete') | crontab -
+```
+
+매일 새벽 4시에 백업하고 7일 지난 파일은 지운다. 복구: `gunzip -c ~/backups/파일.sql.gz | docker compose exec -T db psql -U bridge bridge`
+
+## 보안 설정 요약
+
+- 열린 포트는 80·443뿐 (db, redis, backend는 서버 안에서만 접근)
+- HTTPS 강제(HSTS), iframe 삽입 금지, 요청 크기 512KB 제한, API 문서 끔
+- 로그인: 아이디별 5회 실패 시 1분 잠금 + IP별 1분 60번·새 계정 1시간 30개
+- 코드 실행: 네트워크 차단·128MB·5초·출력 64KB, 사용자별 1분 20번
+- 비밀값은 서버의 `deploy/.env`에만 있다 (`chmod 600`). 서버 열쇠는 레포 읽기 전용 deploy key
+
 ## 확인·문제 해결
 
 ```bash

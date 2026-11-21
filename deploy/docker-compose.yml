@@ -8,6 +8,12 @@ name: bridge-prod
 
 x-restart: &restart
   restart: unless-stopped
+  # 로그가 디스크를 채우지 않게 컨테이너마다 10MB × 3개까지만 남긴다
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
   db:
@@ -40,8 +46,11 @@ services:
     env_file: .env
     environment:
       CONTENT_DIR: /app/content
+      DISABLE_DOCS: "1"
     volumes:
       - ../content:/app/content:ro
+    # Caddy가 넘겨준 실제 접속 IP를 쓴다 (IP별 로그인 제한용). backend는 Caddy만 접근할 수 있다
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
     depends_on:
       db:
         condition: service_healthy
