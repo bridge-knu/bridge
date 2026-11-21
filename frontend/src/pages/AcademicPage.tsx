@@ -79,29 +79,27 @@ function Results({ query, changes }: { query: AcademicQuery; changes: AcademicCh
 
   if (ALL_CHANGES.length === 0) {
     return (
-      <section className="academic-results" aria-live="polite">
-        <p className="academic-empty">
-          아직 등록된 학사 변경 정보가 없어요. 학교 공식 공지로 확인한 내용만 올리고 있으니, 그전까지는 학과
-          사무실이나 학사 공지를 확인해 주세요.
-        </p>
-      </section>
+      <p className="academic-empty">
+        아직 등록된 학사 변경 정보가 없어요. 학교 공식 공지로 확인한 내용만 올리고 있으니, 그전까지는 학과
+        사무실이나 학사 공지를 확인해 주세요.
+      </p>
     )
   }
 
   if (changes.length === 0) {
     return (
-      <section className="academic-results" aria-live="polite">
+      <>
         <p className="form-hint">{period}</p>
         <p className="academic-empty">
           이 기간에 {query.admissionYear}학번에 해당하는 학사 변경 사항이 없어요. 등록된 항목은 공식 공지로 확인한
           것만이라, 자세한 내용은 학사 공지도 함께 확인해 주세요.
         </p>
-      </section>
+      </>
     )
   }
 
   return (
-    <section className="academic-results" aria-live="polite">
+    <>
       <p className="form-hint">
         {period} · {query.admissionYear}학번 기준 <strong>{changes.length}건</strong>
       </p>
@@ -119,7 +117,7 @@ function Results({ query, changes }: { query: AcademicQuery; changes: AcademicCh
           </li>
         ))}
       </ol>
-    </section>
+    </>
   )
 }
 
@@ -185,7 +183,10 @@ export default function AcademicPage() {
         <button type="submit">바뀐 제도 보기</button>
       </form>
 
-      {query && <Results query={query} changes={filterChanges(ALL_CHANGES, query)} />}
+      {/* 결과가 바뀌면 스크린리더가 읽도록 live 영역은 항상 둔다 */}
+      <div className="academic-results" aria-live="polite">
+        {query && <Results query={query} changes={filterChanges(ALL_CHANGES, query)} />}
+      </div>
     </section>
   )
 }
