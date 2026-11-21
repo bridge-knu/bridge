@@ -1,0 +1,28 @@
+# SITE_ADDRESS가 도메인이면 HTTPS 인증서를 자동으로 받는다 (예: 34-64-12-34.sslip.io).
+# 비워 두면 :80 으로 HTTP만 연다 (로컬 확인용).
+{$SITE_ADDRESS} {
+	encode gzip
+
+	# /api/auth/login → backend의 /auth/login (개발 서버 프록시와 같은 규칙)
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		# 화면 주소(/plan, /blocks/... )로 바로 들어와도 index.html을 준다
+		try_files {path} /index.html
+		file_server
+
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
