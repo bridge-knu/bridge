@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -26,7 +26,8 @@ class ErrorResponse(CamelModel):
 
 
 class LoginRequest(CamelModel):
-    login_id: str = Field(min_length=1, max_length=30, examples=["demo"])
+    # 제어 문자(NUL, 줄바꿈 등)는 받지 않는다. NUL은 PostgreSQL에 저장할 수 없다
+    login_id: str = Field(min_length=1, max_length=30, pattern=r"^[^\x00-\x1f\x7f]+$", examples=["demo"])
     pin: str = Field(pattern=r"^\d{4}$", examples=["0000"])
 
 
@@ -125,11 +126,27 @@ class PlanDay(CamelModel):
     blocks: list[PlanBlock]
 
 
+class DeferredConcept(CamelModel):
+    """복학일까지 시간이 부족해 복학 후로 미룬 개념."""
+
+    concept_id: str
+    concept_name: str
+    blocks: int = Field(description="이 개념에 필요했던 30분 블록 수")
+
+
 class Plan(CamelModel):
+    today: date = Field(description="서버 기준 오늘 날짜 (한국 시간). 화면은 브라우저 날짜 대신 이 값을 쓴다")
     return_date: date
     daily_minutes: int
-    today_remaining_minutes: int
+    today_remaining_minutes: int = Field(
+        description="오늘 공부할 수 있는 남은 시간(분) = 하루 가용 시간 - 오늘 완료한 블록 시간 (최소 0)"
+    )
     days: list[PlanDay]
+    deferred_concepts: list[DeferredConcept] = Field(default_factory=list)
+    message: str | None = Field(
+        default=None,
+        description="미룬 개념이 있을 때만 안내 문구 (예: 시간이 부족해 연결 리스트은(는) 복학 후로 미뤘어요)",
+    )
 
 
 # ---- 블록 학습 ----
@@ -182,6 +199,14 @@ class CompleteResponse(CamelModel):
 
 class CodeSaveRequest(CamelModel):
     code: str = Field(max_length=65536)
+
+    @field_validator("code")
+    @classmethod
+    def _no_nul(cls, v: str) -> str:
+        # PostgreSQL 텍스트에는 NUL 문자를 저장할 수 없어서 500이 난다. 요청 단계에서 422로 거부한다
+        if "\x00" in v:
+            raise ValueError("코드에 NUL 문자를 넣을 수 없어요")
+        return v
 
 
 class CodeSaveResponse(CamelModel):
