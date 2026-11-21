@@ -65,8 +65,9 @@ services:
   worker:
     <<: *restart
     build: ../backend
-    env_file: .env
+    # 워커는 Docker를 다룰 수 있어서 침해되면 위험하다. .env 대신 꼭 필요한 값만 넘긴다 (DB 비밀번호·JWT 키 없음)
     environment:
+      REDIS_URL: redis://redis:6379/0
       SANDBOX_IMAGE: bridge-sandbox
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
