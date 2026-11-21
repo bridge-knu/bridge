@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,7 +17,15 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Bridge API", lifespan=lifespan)
+# 배포에서는 API 문서(/docs, /openapi.json)를 끈다 (DISABLE_DOCS=1)
+docs_off = os.environ.get("DISABLE_DOCS") == "1"
+app = FastAPI(
+    title="Bridge API",
+    lifespan=lifespan,
+    docs_url=None if docs_off else "/docs",
+    redoc_url=None if docs_off else "/redoc",
+    openapi_url=None if docs_off else "/openapi.json",
+)
 errors.install(app)
 
 for module in (health, auth, profile, diagnosis, plan, blocks, code, run):

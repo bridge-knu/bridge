@@ -221,3 +221,51 @@ def test_db_down_is_503(api_client):
     r = post_login(api_client, "kim", "1234")
     assert r.status_code == 503
     assert r.json()["code"] == "SERVICE_UNAVAILABLE"
+
+
+# ---- IP별 횟수 제한 ----
+
+
+def test_login_rate_limit_per_ip(api_client, monkeypatch):
+    from app.api import auth
+
+    monkeypatch.setattr(auth, "LOGIN_PER_IP", (3, 60))
+    codes = [post_login(api_client, f"user{i}", "1234").status_code for i in range(4)]
+    assert codes == [200, 200, 200, 429]
+    assert post_login(api_client, "demo", "0000").json()["code"] == "TOO_MANY_REQUESTS"
+
+
+def test_signup_rate_limit_per_ip(api_client, monkeypatch):
+    from app.api import auth
+
+    monkeypatch.setattr(auth, "SIGNUP_PER_IP", (2, 3600))
+    assert post_login(api_client, "a1", "1234").status_code == 200
+    assert post_login(api_client, "a2", "1234").status_code == 200
+    r = post_login(api_client, "a3", "1234")
+    assert r.status_code == 429
+    assert r.json()["code"] == "TOO_MANY_REQUESTS"
+    # 이미 있는 계정 로그인은 계속 된다
+    assert post_login(api_client, "a1", "1234").status_code == 200
+
+
+def test_rate_limit_window_expires(fake_redis):
+    from app import rate_limit
+
+    assert rate_limit.hit(fake_redis, "x", 1, 60)
+    assert not rate_limit.hit(fake_redis, "x", 1, 60)
+    assert 0 < fake_redis.ttl("rate:x") <= 60
+    fake_redis.delete("rate:x")  # 1분이 지난 상황
+    assert rate_limit.hit(fake_redis, "x", 1, 60)
+
+
+def test_docs_can_be_disabled(monkeypatch):
+    import importlib
+
+    import app.main as main
+
+    monkeypatch.setenv("DISABLE_DOCS", "1")
+    off = importlib.reload(main).app
+    paths = {r.path for r in off.routes}
+    assert "/docs" not in paths and "/openapi.json" not in paths
+    monkeypatch.delenv("DISABLE_DOCS")
+    importlib.reload(main)

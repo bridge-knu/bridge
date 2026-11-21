@@ -79,6 +79,7 @@ docs/           개발 문서
 | BLOCK_NOT_FOUND | 404 | 블록을 찾을 수 없어요 | 없는 블록 |
 | JOB_NOT_FOUND | 404 | 실행 작업을 찾을 수 없어요 | 없거나 다른 사용자의 실행 작업 |
 | SERVICE_UNAVAILABLE | 503 | 잠시 후 다시 시도해 주세요 | DB·Redis에 연결할 수 없음 |
+| TOO_MANY_REQUESTS | 429 | 요청이 너무 많아요. 잠시 후 다시 시도해 주세요 | 같은 IP에서 로그인 1분 60번 또는 새 계정 1시간 30개를 넘음 |
 
 입력값이 형식에 맞지 않으면 422이고, FastAPI 기본 형태(`{"detail": [...]}`, `code` 없음)입니다.
 
@@ -87,6 +88,8 @@ docs/           개발 문서
 - 아이디 + 숫자 4자리 PIN. 없는 아이디로 로그인하면 그 PIN으로 가입됩니다 (`isNewUser: true`).
 - **데모 계정: `demo` / `0000`** (서버가 시작할 때 자동으로 만들어짐)
 - 같은 아이디로 PIN을 5번 틀리면 1분 동안 로그인이 막힙니다 (429).
+- 같은 IP에서는 로그인 1분 60번, 새 계정 1시간 30개까지입니다 (429 `TOO_MANY_REQUESTS`). 여러 아이디를 돌아가며 PIN을 맞히거나 계정을 대량으로 만드는 것을 막습니다.
+- 배포에서는 `DISABLE_DOCS=1`로 `/docs`와 `/openapi.json`을 끕니다.
 - 로그인 외의 모든 API는 `Authorization: Bearer <token>` 헤더가 필요합니다. 토큰이 없거나 만료(12시간)·위조면 401 `UNAUTHORIZED`.
 - http://localhost:8000/docs 에서 시험할 때는 `/auth/login`으로 받은 `token`을 오른쪽 위 **Authorize** 버튼에 넣으세요 (`Bearer` 없이 토큰만).
 
