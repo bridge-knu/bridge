@@ -147,3 +147,15 @@ def test_stale_job_is_reported_as_failed(client, fake_redis):
     res = client.get(f"/run/{job_id}").json()
     assert res["status"] == "done"
     assert res["exitCode"] == 1
+
+
+def test_runs_per_user_are_limited(client, login, monkeypatch):
+    monkeypatch.setattr(run, "RUNS_PER_USER", (2, 60))
+    submit(client)
+    submit(client)
+    r = client.post("/run", json={"lang": "c", "code": "x"})
+    assert r.status_code == 429
+    assert r.json()["code"] == "TOO_MANY_REQUESTS"
+    # 다른 사람은 영향 없음
+    other = {"Authorization": f"Bearer {login('other')}"}
+    assert client.post("/run", json={"lang": "c", "code": "x"}, headers=other).status_code == 202

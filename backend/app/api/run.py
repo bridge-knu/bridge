@@ -4,7 +4,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from redis import Redis
 
-from app import run_queue
+from app import rate_limit, run_queue
 from app.api.blocks import get_block_or_404
 from app.api.deps import get_current_user
 from app.api.mock_data import BLOCK_BY_ID
@@ -17,6 +17,8 @@ router = APIRouter(prefix="/run", tags=["run"])
 
 # 큐에 이만큼 쌓여 있으면 새 요청을 받지 않는다 (워커 4개 기준 수십 초 분량)
 MAX_QUEUE = 100
+# 한 사람이 실행 대기열을 독차지하지 못하게 한다 (1분에 20번)
+RUNS_PER_USER = (20, 60)
 # 워커가 죽는 등으로 이 시간 안에 끝나지 않은 작업은 실패로 돌려줘서 화면이 계속 기다리지 않게 한다
 STALE_SECONDS = 90
 
@@ -31,7 +33,7 @@ def normalize_output(text: str) -> str:
     "",
     response_model=RunAccepted,
     status_code=202,
-    responses=responses("BLOCK_NOT_FOUND", "SERVICE_UNAVAILABLE"),
+    responses=responses("BLOCK_NOT_FOUND", "TOO_MANY_REQUESTS", "SERVICE_UNAVAILABLE"),
     summary="코드 실행 요청 → jobId",
     description=(
         "작업을 큐에 넣고 바로 jobId를 돌려준다. 워커가 샌드박스 컨테이너에서 실행한다. "
@@ -41,6 +43,8 @@ def normalize_output(text: str) -> str:
 def run(body: RunRequest, user: User = Depends(get_current_user), r: Redis = Depends(get_redis)):
     if body.block_id is not None:
         get_block_or_404(body.block_id)
+    if not rate_limit.hit(r, f"run:{user.id}", *RUNS_PER_USER):
+        raise ApiError("TOO_MANY_REQUESTS")
     if run_queue.queue_length(r) >= MAX_QUEUE:
         raise ApiError("SERVICE_UNAVAILABLE")
     job_id = uuid.uuid4().hex
