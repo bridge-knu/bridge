@@ -1,9 +1,7 @@
-import time
-
 import pytest
 from sqlalchemy import select
 
-from app.api import mock_data, run
+from app.api import mock_data
 from app.clock import today
 from app.models import CodeSnapshot, Profile, User
 
@@ -11,14 +9,8 @@ from app.models import CodeSnapshot, Profile, User
 @pytest.fixture
 def client(api_client, login):
     mock_data.USERS.clear()
-    mock_data.JOBS.clear()
     api_client.headers["Authorization"] = f"Bearer {login('tester')}"
     return api_client
-
-
-@pytest.fixture
-def instant_run(monkeypatch):
-    monkeypatch.setattr(run, "MOCK_RUN_SECONDS", 0)
 
 
 # ---- 프로필 ----
@@ -323,63 +315,6 @@ def test_complete_without_body(client):
     assert r.status_code == 200
     assert r.json()["correctCount"] == 0
     assert r.json()["nextBlockId"] is None
-
-
-# ---- 코드 실행 ----
-
-
-def run_and_wait(client, payload):
-    r = client.post("/run", json=payload)
-    assert r.status_code == 202
-    return client.get(f"/run/{r.json()['jobId']}").json()
-
-
-def test_run_is_running_first(client):
-    job_id = client.post("/run", json={"lang": "c", "code": "x"}).json()["jobId"]
-    assert client.get(f"/run/{job_id}").json()["status"] == "running"
-
-
-def test_run_becomes_done(client):
-    job_id = client.post("/run", json={"lang": "c", "code": "x"}).json()["jobId"]
-    time.sleep(run.MOCK_RUN_SECONDS + 0.1)
-    assert client.get(f"/run/{job_id}").json()["status"] == "done"
-
-
-def test_run_block_matches_expected(client, instant_run):
-    res = run_and_wait(client, {"lang": "c", "code": "...", "blockId": "b-array-1"})
-    assert res["status"] == "done"
-    assert res["stdout"] == "15\n"
-    assert res["matchesExpected"] is True
-
-
-def test_run_without_block(client, instant_run):
-    res = run_and_wait(client, {"lang": "python", "code": "print('hello')"})
-    assert res["stdout"] == "hello\n"
-    assert res["matchesExpected"] is None
-
-
-def test_run_infinite_loop_times_out(client, instant_run):
-    res = run_and_wait(client, {"lang": "c", "code": "while (1) {}", "blockId": "b-array-1"})
-    assert res["timedOut"] is True
-    assert res["matchesExpected"] is False
-
-
-def test_run_compile_error(client, instant_run):
-    res = run_and_wait(client, {"lang": "c", "code": "COMPILE_ERROR"})
-    assert res["exitCode"] == 1
-    assert "error" in res["stderr"]
-
-
-def test_run_unknown_job(client):
-    r = client.get("/run/nope")
-    assert r.status_code == 404
-    assert r.json() == {"detail": "실행 작업을 찾을 수 없어요", "code": "JOB_NOT_FOUND"}
-
-
-def test_run_job_of_other_user_is_hidden(client, login):
-    job_id = client.post("/run", json={"lang": "c", "code": "x"}).json()["jobId"]
-    other = {"Authorization": f"Bearer {login('other')}"}
-    assert client.get(f"/run/{job_id}", headers=other).status_code == 404
 
 
 def test_all_12_endpoints_in_docs(client):

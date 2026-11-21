@@ -28,6 +28,7 @@ docker compose up -d
 | backend | 8000 | FastAPI |
 | db | 5432 | PostgreSQL 16 |
 | redis | 6379 | Redis 7 |
+| worker | - | 코드 실행 작업 처리 (샌드박스 컨테이너 실행) |
 
 ## 폴더 구조
 
@@ -78,7 +79,7 @@ docs/           개발 문서
 | DIAGNOSIS_NOT_FINISHED | 400 | 진단을 먼저 끝내 주세요 | 진단을 시작하지 않았거나 끝내기 전에 결과 요청 |
 | BLOCK_NOT_FOUND | 404 | 블록을 찾을 수 없어요 | 없는 블록 |
 | JOB_NOT_FOUND | 404 | 실행 작업을 찾을 수 없어요 | 없거나 다른 사용자의 실행 작업 |
-| SERVICE_UNAVAILABLE | 503 | 잠시 후 다시 시도해 주세요 | DB·Redis에 연결할 수 없음 |
+| SERVICE_UNAVAILABLE | 503 | 잠시 후 다시 시도해 주세요 | DB·Redis에 연결할 수 없음, 코드 실행 대기열이 가득 참 |
 
 입력값이 형식에 맞지 않으면 422이고, FastAPI 기본 형태(`{"detail": [...]}`, `code` 없음)입니다.
 
@@ -108,14 +109,29 @@ docs/           개발 문서
 
 ### 아직 mock인 API
 
-진단·플랜·블록 완료·코드 실행은 엔진과 샌드박스가 연결되기 전까지 가짜 데이터를 돌려줍니다. 이 상태는 서버를 재시작하면 사라집니다. 화면에서 오류 상황을 확인할 때 아래 값을 쓰세요.
+진단·플랜·블록 완료는 엔진이 연결되기 전까지 가짜 데이터를 돌려줍니다. 이 상태는 서버를 재시작하면 사라집니다. 코드 실행(`/run`)은 아래처럼 실제로 실행합니다.
 
-| 상황 | 방법 |
+### 코드 실행 샌드박스
+
+`POST /run`이 작업을 Redis 큐에 넣으면 worker 컨테이너가 꺼내서 작업마다 새 `bridge-sandbox` 컨테이너(gcc, python)로 실행합니다. 화면은 `GET /run/{jobId}`를 0.5초마다 불러서 `status`가 `queued` → `running` → `done`이 되면 결과를 보여 주면 됩니다.
+
+| 제한 | 값 |
 | --- | --- |
-| 코드 실행 시간 초과 | 코드에 `while (1)` 또는 `for (;;)` |
-| 컴파일 에러 | 코드에 `COMPILE_ERROR` |
+| 실행 시간 | 5초 (넘으면 `timedOut: true`, `exitCode: 124`) |
+| 컴파일 시간 | 10초 |
+| 메모리 / CPU / 프로세스 | 128MB / 0.5개 / 64개 |
+| 출력 | 64KB (넘는 부분은 잘림) |
+| 네트워크 | 차단 |
+| 파일 쓰기 | `/tmp`(16MB)만 |
+| 동시 실행 | 4개, 나머지는 큐에서 대기 |
 
-코드 실행은 1초 동안 `running`이었다가 `done`이 됩니다.
+- 컴파일 에러는 `stderr`에 gcc 메시지가 그대로 오고 `exitCode`가 0이 아닙니다.
+- `blockId`를 보내면 블록의 정답 출력과 비교해서 `matchesExpected`를 줍니다 (줄 끝 공백·마지막 줄바꿈 차이는 무시).
+- 대기열에서 60초 넘게 기다린 작업은 실행하지 않고, 실행을 시작하고 45초 안에 결과가 없는 작업은 실패(`exitCode: 1`)로 돌려줍니다.
+- 학생 코드가 실행기의 출력에 직접 쓰는 우회를 막았고, worker는 컨테이너 출력을 1MB까지만 받습니다. worker에는 Redis 주소만 넘깁니다 (DB 비밀번호·JWT 키 없음).
+- 결과는 1시간 동안 보관합니다.
+
+`docker compose up -d --build`를 하면 샌드박스 이미지 빌드와 worker 실행까지 같이 됩니다. worker는 호스트의 Docker(`/var/run/docker.sock`)로 컨테이너를 띄웁니다.
 
 ## DB
 
@@ -138,6 +154,6 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-API·DB 테스트는 `docker compose up -d`로 postgres가 떠 있을 때만 실행되고, 없으면 건너뜁니다. PR을 올리기 전에는 `REQUIRE_DB=1 pytest`로 돌려서 건너뛴 테스트 없이 모두 통과하는지 확인하세요. Redis는 테스트용 가짜(fakeredis)를 씁니다. 테스트 데이터는 끝나면 되돌려서 DB에 남지 않습니다.
+API·DB 테스트는 `docker compose up -d`로 postgres가 떠 있을 때만 실행되고, 없으면 건너뜁니다. 실제 샌드박스 테스트(`tests/test_sandbox.py`)는 `bridge-sandbox` 이미지와 `docker` 명령이 있을 때만 실행됩니다. PR을 올리기 전에는 `REQUIRE_DB=1 pytest`로 돌려서 건너뛴 테스트 없이 모두 통과하는지 확인하세요. Redis는 테스트용 가짜(fakeredis)를 씁니다. 테스트 데이터는 끝나면 되돌려서 DB에 남지 않습니다.
 
 개발 규칙은 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)를 참고하세요.

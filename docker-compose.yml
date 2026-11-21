@@ -43,5 +43,29 @@ services:
       redis:
         condition: service_healthy
 
+  # 학생 코드를 실행할 이미지(bridge-sandbox)를 빌드만 하고 바로 끝난다.
+  sandbox:
+    build: ./sandbox
+    image: bridge-sandbox
+    entrypoint: ["true"]
+
+  # Redis 큐에서 코드 실행 작업을 꺼내 bridge-sandbox 컨테이너로 실행한다.
+  worker:
+    build: ./backend
+    # 워커는 Docker를 다룰 수 있어서 침해되면 위험하다. .env 대신 꼭 필요한 값만 넘긴다 (DB 비밀번호·JWT 키 없음)
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SANDBOX_IMAGE: bridge-sandbox
+    volumes:
+      - ./backend/app:/app/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python -m app.worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      sandbox:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:

@@ -22,6 +22,7 @@ ERRORS: dict[str, tuple[int, str]] = {
     "BLOCK_NOT_FOUND": (404, "블록을 찾을 수 없어요"),
     "JOB_NOT_FOUND": (404, "실행 작업을 찾을 수 없어요"),
     "SERVICE_UNAVAILABLE": (503, "잠시 후 다시 시도해 주세요"),
+    "TOO_MANY_REQUESTS": (429, "요청이 너무 많아요. 잠시 후 다시 시도해 주세요"),
 }
 
 

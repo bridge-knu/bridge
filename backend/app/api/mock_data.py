@@ -144,18 +144,7 @@ class UserState:
     done_dates: dict[str, date] = field(default_factory=dict)  # 블록 id → 완료한 날짜 (KST)
 
 
-@dataclass
-class Job:
-    job_id: str
-    user_id: int
-    created: float
-    lang: str
-    code: str
-    block_id: str | None
-
-
 USERS: dict[int, UserState] = {}
-JOBS: dict[str, Job] = {}
 
 
 def current_user(user: User = Depends(get_current_user)) -> UserState:
