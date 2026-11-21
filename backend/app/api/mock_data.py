@@ -139,6 +139,7 @@ def now() -> datetime:
 class UserState:
     profile: dict | None = None
     diagnosis_index: int = 0
+    diagnosis_done: bool = False
     plan_created: bool = False
     done_blocks: set[str] = field(default_factory=set)
     code: dict[str, tuple[str, datetime]] = field(default_factory=dict)

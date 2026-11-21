@@ -108,7 +108,9 @@ def test_unknown_block_404(client):
 
 
 def test_unknown_job_404(client):
-    assert client.get("/run/nope").status_code == 404
+    r = client.get("/run/nope")
+    assert r.status_code == 404
+    assert r.json() == {"detail": "실행 작업을 찾을 수 없어요", "code": "JOB_NOT_FOUND"}
 
 
 def test_job_of_other_user_is_hidden(client, login):
@@ -123,6 +125,7 @@ def test_full_queue_is_503(client, fake_redis, monkeypatch):
     submit(client)
     r = client.post("/run", json={"lang": "c", "code": "x"})
     assert r.status_code == 503
+    assert r.json()["code"] == "SERVICE_UNAVAILABLE"
 
 
 def test_expired_job_is_skipped(fake_redis):

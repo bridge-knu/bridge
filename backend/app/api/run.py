@@ -1,14 +1,15 @@
 import time
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from redis import Redis
 
 from app import run_queue
 from app.api.blocks import get_block_or_404
 from app.api.deps import get_current_user
 from app.api.mock_data import BLOCK_BY_ID
-from app.api.schemas import ErrorResponse, RunAccepted, RunRequest, RunResult
+from app.api.errors import ApiError, responses
+from app.api.schemas import RunAccepted, RunRequest, RunResult
 from app.login_lock import get_redis
 from app.models import User
 
@@ -30,7 +31,7 @@ def normalize_output(text: str) -> str:
     "",
     response_model=RunAccepted,
     status_code=202,
-    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+    responses=responses("BLOCK_NOT_FOUND", "SERVICE_UNAVAILABLE"),
     summary="코드 실행 요청 → jobId",
     description=(
         "작업을 큐에 넣고 바로 jobId를 돌려준다. 워커가 샌드박스 컨테이너에서 실행한다. "
@@ -41,7 +42,7 @@ def run(body: RunRequest, user: User = Depends(get_current_user), r: Redis = Dep
     if body.block_id is not None:
         get_block_or_404(body.block_id)
     if run_queue.queue_length(r) >= MAX_QUEUE:
-        raise HTTPException(503, "잠시 후 다시 시도해 주세요")
+        raise ApiError("SERVICE_UNAVAILABLE")
     job_id = uuid.uuid4().hex
     run_queue.enqueue(
         r,
@@ -62,14 +63,14 @@ def run(body: RunRequest, user: User = Depends(get_current_user), r: Redis = Dep
 @router.get(
     "/{job_id}",
     response_model=RunResult,
-    responses={404: {"model": ErrorResponse}},
+    responses=responses("JOB_NOT_FOUND"),
     summary="실행 결과 (출력, 에러, 시간 초과)",
     description="프론트는 status가 done이 될 때까지 0.5초마다 호출한다. 결과는 1시간 동안 보관한다.",
 )
 def result(job_id: str, user: User = Depends(get_current_user), r: Redis = Depends(get_redis)):
     job = run_queue.load(r, job_id)
     if job is None or job["userId"] != user.id:
-        raise HTTPException(404, "실행 작업을 찾을 수 없어요")
+        raise ApiError("JOB_NOT_FOUND")
     if job["status"] != "done":
         if time.time() - job["createdAt"] > STALE_SECONDS:
             return RunResult(

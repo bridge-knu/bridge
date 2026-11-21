@@ -1,6 +1,7 @@
 """공통 테스트 준비.
 
 - DB: docker compose의 postgres를 쓴다. 연결할 수 없으면 DB가 필요한 테스트는 건너뛴다.
+  REQUIRE_DB=1이면 건너뛰지 않고 실패한다 (PR 전 확인용).
   각 테스트는 트랜잭션 안에서 실행하고 끝나면 되돌리므로 DB에 데이터가 남지 않는다.
 - Redis: 실제 Redis 대신 메모리용 가짜(fakeredis)를 쓴다.
 """
@@ -36,6 +37,8 @@ def engine():
         with eng.connect():
             pass
     except OperationalError:
+        if os.environ.get("REQUIRE_DB") == "1":
+            pytest.fail("postgres에 연결할 수 없음 (REQUIRE_DB=1이라 건너뛰지 않음)")
         pytest.skip("postgres에 연결할 수 없음 (docker compose up -d 필요)")
     yield eng
     eng.dispose()
