@@ -445,3 +445,75 @@ a {
   border-color: #2563eb;
   background-color: #eff6ff;
 }
+
+.concept-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.concept-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.concept-legend .swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 3px;
+  border: 2px solid;
+}
+
+.concept-graph {
+  height: 70vh;
+  min-height: 360px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.concept-node {
+  border: 2px solid;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.concept-node.clickable {
+  cursor: pointer;
+}
+
+.concept-node.clickable:hover {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+.concept-node.strong,
+.concept-legend .swatch.strong {
+  border-color: #16a34a;
+  background-color: #dcfce7;
+  color: #14532d;
+}
+
+.concept-node.weak,
+.concept-legend .swatch.weak {
+  border-color: #dc2626;
+  background-color: #fee2e2;
+  color: #7f1d1d;
+}
+
+.concept-node-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.85rem;
+}
+
+.concept-node-body span {
+  font-size: 0.75rem;
+}
