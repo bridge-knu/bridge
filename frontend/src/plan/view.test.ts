@@ -22,6 +22,7 @@ const block = (blockId: string, order: number, done = false, minutes = 30): Plan
 const TODAY = '2026-11-21'
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
+  today: TODAY,
   returnDate: '2027-03-02',
   dailyMinutes: 60,
   todayRemainingMinutes: 60,
@@ -97,6 +98,7 @@ describe('toPlanView: 오늘 남은 시간', () => {
       minutes: 60,
       lastBlockId: 'b-pointer-1',
       lastConceptName: 'b-pointer-1',
+      todayBlocksDone: false,
     })
     expect([...v.reachableToday]).toEqual(['b-array-1', 'b-pointer-1'])
   })
@@ -125,18 +127,68 @@ describe('toPlanView: 오늘 남은 시간', () => {
     expect(todayGuideText(v.today)).toContain('시간이 부족해요')
   })
 
-  it('오늘 블록을 다 끝냈거나 남은 시간이 0이면 todayDone', () => {
-    expect(toPlanView(plan({ todayRemainingMinutes: 0 }), TODAY).today).toEqual({ kind: 'todayDone' })
-    const done = plan({ days: [{ date: TODAY, blocks: [block('b-a', 1, true)] }], todayRemainingMinutes: 30 })
-    expect(toPlanView(done, TODAY).today).toEqual({ kind: 'todayDone' })
-    expect(todayGuideText({ kind: 'todayDone' })).toBe('오늘 블록을 모두 끝냈어요')
+  it('남은 시간이 0이면 timeUsed (오늘 블록이 남아 있어도)', () => {
+    const v = toPlanView(plan({ todayRemainingMinutes: 0 }))
+    expect(v.today).toEqual({ kind: 'timeUsed' })
+    expect(v.reachableToday.size).toBe(0)
+    expect(todayGuideText(v.today)).toBe('오늘 공부할 시간을 모두 썼어요. 내일 이어서 해요')
   })
 
-  it('오늘 날짜가 플랜에 없으면 noToday', () => {
-    const v = toPlanView(plan(), '2026-12-25')
-    expect(v.today).toEqual({ kind: 'noToday' })
-    expect(v.reachableToday.size).toBe(0)
-    expect(todayGuideText(v.today)).toBe('오늘은 배정된 블록이 없어요')
+  it('오늘 블록을 다 끝냈어도 남은 시간이 있으면 다음 날 블록까지 이어서 센다', () => {
+    const v = toPlanView(
+      plan({
+        days: [
+          { date: TODAY, blocks: [block('b-a', 1, true)] },
+          { date: '2026-11-22', blocks: [block('b-b', 1), block('b-c', 2)] },
+        ],
+        todayRemainingMinutes: 30,
+      }),
+    )
+    expect(v.today).toEqual({
+      kind: 'remaining',
+      minutes: 30,
+      lastBlockId: 'b-b',
+      lastConceptName: 'b-b',
+      todayBlocksDone: true,
+    })
+    expect([...v.reachableToday]).toEqual(['b-b'])
+    expect(todayGuideText(v.today)).toBe('오늘 블록을 모두 끝냈어요. 오늘 남은 시간 30분, b-b 블록까지 가능해요')
+  })
+
+  it('지난 날 끝내지 못한 블록부터 날짜순으로 더한다', () => {
+    const v = toPlanView(
+      plan({
+        days: [
+          { date: TODAY, blocks: [block('b-today', 1)] },
+          { date: '2026-11-20', blocks: [block('b-past', 1)] },
+        ],
+        todayRemainingMinutes: 30,
+      }),
+    )
+    expect([...v.reachableToday]).toEqual(['b-past'])
+    expect(v.today).toMatchObject({ kind: 'remaining', lastBlockId: 'b-past', todayBlocksDone: false })
+  })
+
+  it('오늘 날짜가 플랜에 없어도 남은 시간 안의 블록을 보여 준다', () => {
+    const v = toPlanView(plan({ today: '2026-11-20' }))
+    expect(v.days.some((d) => d.isToday)).toBe(false)
+    expect(v.today).toMatchObject({ kind: 'remaining', lastBlockId: 'b-pointer-1', todayBlocksDone: true })
+  })
+})
+
+describe('toPlanView: 오늘 날짜', () => {
+  it('브라우저 날짜가 아니라 API의 today로 오늘을 정한다', () => {
+    // 브라우저는 UTC 등 다른 날짜여도 서버(KST)의 today를 따른다
+    const v = toPlanView(plan({ today: '2026-11-22' }))
+    expect(v.todayDate).toBe('2026-11-22')
+    expect(v.days[0]).toMatchObject({ date: '2026-11-22', isToday: true })
+    expect(v.days.find((d) => d.date === TODAY)).toMatchObject({ isToday: false, isPast: true })
+  })
+
+  it('응답에 today가 없을 때만 브라우저 날짜를 쓴다 (PR #38 병합 전)', () => {
+    const { today: _omit, ...legacy } = plan()
+    void _omit
+    expect(toPlanView(legacy).todayDate).toBe(localToday())
   })
 })
 

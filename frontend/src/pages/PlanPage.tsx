@@ -4,7 +4,6 @@ import { generatePlan, getPlan, setAuthToken, type Plan } from '../api.ts'
 import {
   classifyPlanError,
   formatDate,
-  localToday,
   planErrorMessage,
   todayGuideText,
   toPlanView,
@@ -111,7 +110,7 @@ export default function PlanPage() {
   }
 
   const view = useMemo(
-    () => (state.status === 'ready' ? toPlanView(state.plan, localToday()) : null),
+    () => (state.status === 'ready' ? toPlanView(state.plan) : null),
     [state],
   )
 
@@ -174,7 +173,7 @@ export default function PlanPage() {
         <div>
           <h1>학습 플랜</h1>
           <p className="form-hint">
-            복학일 {formatDate(view.returnDate)}까지 · 하루 {view.dailyMinutes}분 · 블록 {view.doneBlocks}/
+            오늘 {formatDate(view.todayDate)} · 복학일 {formatDate(view.returnDate)}까지 · 하루 {view.dailyMinutes}분 · 블록 {view.doneBlocks}/
             {view.totalBlocks}개 완료
           </p>
         </div>

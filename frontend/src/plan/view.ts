@@ -17,14 +17,23 @@ export interface PlanDayView {
 
 /** 오늘 남은 시간 안내 */
 export type TodayGuide =
-  /** 오늘 남은 블록이 있다. lastBlockId: 남은 시간 안에 끝낼 수 있는 마지막 블록 (없으면 null) */
-  | { kind: 'remaining'; minutes: number; lastBlockId: string | null; lastConceptName: string | null }
-  /** 오늘 블록을 모두 끝냈다 */
-  | { kind: 'todayDone' }
-  /** 오늘 날짜에 배정된 블록이 없다 */
-  | { kind: 'noToday' }
+  /**
+   * 오늘 공부할 시간이 남았다. lastBlockId: 남은 시간 안에 끝낼 수 있는 마지막 블록 (없으면 null).
+   * todayBlocksDone: 오늘 날짜에 배정된 블록은 이미 다 끝냈다 (배정된 블록이 없을 때도 true)
+   */
+  | {
+      kind: 'remaining'
+      minutes: number
+      lastBlockId: string | null
+      lastConceptName: string | null
+      todayBlocksDone: boolean
+    }
+  /** 오늘 가용 시간을 다 썼다 (todayRemainingMinutes가 0) */
+  | { kind: 'timeUsed' }
 
 export interface PlanView {
+  /** 오늘 날짜 (API의 today, YYYY-MM-DD) */
+  todayDate: string
   returnDate: string
   dailyMinutes: number
   /** 오늘이 맨 앞, 나머지는 날짜순 */
@@ -41,7 +50,7 @@ export interface PlanView {
   message: string | null
 }
 
-/** 브라우저 기준 오늘 날짜 (YYYY-MM-DD, 로컬 시간) */
+/** 브라우저 기준 오늘 날짜 (YYYY-MM-DD, 로컬 시간). API가 today를 주지 않을 때만 대신 쓴다 */
 export function localToday(now: Date = new Date()): string {
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
@@ -50,7 +59,8 @@ export function localToday(now: Date = new Date()): string {
 }
 
 /**
- * 오늘 블록을 순서대로 보며 todayRemainingMinutes 안에 들어가는 블록까지 고른다.
+ * 끝내지 않은 블록을 플랜 순서(날짜 → order)대로 더해 todayRemainingMinutes 안에 들어가는 블록까지 고른다.
+ * (README "플랜의 날짜와 남은 시간": 안 끝낸 블록 시간을 순서대로 더해서 이 값 안에 드는 데까지)
  * 남은 시간 자체는 백엔드 값을 그대로 쓴다.
  */
 function reachable(blocks: PlanBlock[], remainingMinutes: number): PlanBlock[] {
@@ -65,7 +75,10 @@ function reachable(blocks: PlanBlock[], remainingMinutes: number): PlanBlock[] {
   return result
 }
 
-export function toPlanView(plan: Plan, today: string): PlanView {
+/**
+ * today: 오늘 날짜. 기본값은 API의 plan.today (한국 시간)이고, 응답에 없을 때만 브라우저 날짜를 쓴다.
+ */
+export function toPlanView(plan: Plan, today: string = plan.today ?? localToday()): PlanView {
   const sorted = [...plan.days]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map<PlanDayView>((d) => {
@@ -85,14 +98,14 @@ export function toPlanView(plan: Plan, today: string): PlanView {
   const todayDay = sorted.find((d) => d.isToday)
   const days = todayDay ? [todayDay, ...sorted.filter((d) => d !== todayDay)] : sorted
 
+  const all = sorted.flatMap((d) => d.blocks)
+
   let guide: TodayGuide
   let reachableToday = new Set<string>()
-  if (!todayDay) {
-    guide = { kind: 'noToday' }
-  } else if (todayDay.allDone || plan.todayRemainingMinutes <= 0) {
-    guide = { kind: 'todayDone' }
+  if (plan.todayRemainingMinutes <= 0) {
+    guide = { kind: 'timeUsed' }
   } else {
-    const fit = reachable(todayDay.blocks, plan.todayRemainingMinutes)
+    const fit = reachable(all, plan.todayRemainingMinutes)
     reachableToday = new Set(fit.map((b) => b.blockId))
     const last = fit.length > 0 ? fit[fit.length - 1] : null
     guide = {
@@ -100,13 +113,14 @@ export function toPlanView(plan: Plan, today: string): PlanView {
       minutes: plan.todayRemainingMinutes,
       lastBlockId: last?.blockId ?? null,
       lastConceptName: last?.conceptName ?? null,
+      todayBlocksDone: !todayDay || todayDay.allDone,
     }
   }
 
-  const all = sorted.flatMap((d) => d.blocks)
   const doneBlocks = all.filter((b) => b.done).length
 
   return {
+    todayDate: today,
     returnDate: plan.returnDate,
     dailyMinutes: plan.dailyMinutes,
     days,
@@ -123,14 +137,14 @@ export function toPlanView(plan: Plan, today: string): PlanView {
 /** 오늘 남은 시간 안내 문구 */
 export function todayGuideText(guide: TodayGuide): string {
   switch (guide.kind) {
-    case 'remaining':
+    case 'remaining': {
+      const prefix = guide.todayBlocksDone ? '오늘 블록을 모두 끝냈어요. ' : ''
       return guide.lastConceptName
-        ? `오늘 남은 시간 ${guide.minutes}분, ${guide.lastConceptName} 블록까지 가능해요`
-        : `오늘 남은 시간 ${guide.minutes}분, 남은 블록을 끝내기에는 시간이 부족해요`
-    case 'todayDone':
-      return '오늘 블록을 모두 끝냈어요'
-    case 'noToday':
-      return '오늘은 배정된 블록이 없어요'
+        ? `${prefix}오늘 남은 시간 ${guide.minutes}분, ${guide.lastConceptName} 블록까지 가능해요`
+        : `${prefix}오늘 남은 시간 ${guide.minutes}분, 다음 블록을 끝내기에는 시간이 부족해요`
+    }
+    case 'timeUsed':
+      return '오늘 공부할 시간을 모두 썼어요. 내일 이어서 해요'
   }
 }
 

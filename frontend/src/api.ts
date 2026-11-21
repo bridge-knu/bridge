@@ -252,18 +252,23 @@ export interface DeferredConcept {
 }
 
 export interface Plan {
+  /**
+   * 서버 기준 오늘 날짜 (한국 시간, YYYY-MM-DD). 화면은 브라우저 날짜 대신 이 값을 쓴다.
+   * PR #38(백엔드)에서 추가된다. 병합 전 응답에는 없을 수 있어 그때만 브라우저 날짜로 대신한다.
+   */
+  today?: string
   /** YYYY-MM-DD */
   returnDate: string
   dailyMinutes: number
-  /** 오늘 날짜 블록 중 아직 끝내지 않은 블록의 분 합계 (백엔드가 계산) */
+  /** 오늘 공부할 수 있는 남은 시간(분) = 하루 가용 시간 − 오늘 완료한 블록 시간 (최소 0, 백엔드가 계산) */
   todayRemainingMinutes: number
   days: PlanDay[]
   /**
-   * 미룬 개념. main의 mock 스키마에는 아직 없고 PR #38(백엔드)에서 추가된다.
-   * 필드가 없으면(undefined) 미룬 개념 정보를 모르는 것으로 보고 표시하지 않는다.
+   * 미룬 개념. 없으면 []. PR #38(백엔드)에서 추가된다.
+   * 병합 전 응답처럼 필드가 없으면(undefined) 미룬 개념 정보를 모르는 것으로 보고 표시하지 않는다.
    */
   deferredConcepts?: DeferredConcept[]
-  /** 미룬 개념이 있을 때만 오는 안내 문구 (PR #38) */
+  /** 미룬 개념이 있을 때만 오는 안내 문구, 없으면 null (PR #38) */
   message?: string | null
 }
 
