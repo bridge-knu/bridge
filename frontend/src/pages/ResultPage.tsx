@@ -158,7 +158,11 @@ export default function ResultPage() {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
+          // 개념 20개 안팎이면 그래프가 화면보다 훨씬 길다. 기본 최소 배율(0.5)에서는 다 못 넣어서
+          // 맨 위(기초 개념)가 잘리므로 더 작게 줄일 수 있게 하고, 처음 열 때 전체가 보이게 맞춘다
+          minZoom={0.1}
           fitView
+          fitViewOptions={{ padding: 0.1 }}
         >
           <Background />
           <Controls showInteractive={false} />

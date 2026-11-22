@@ -8,15 +8,41 @@
 
 const API_BASE: string = import.meta.env.VITE_API_BASE || '/api'
 
-// 토큰은 메모리에만 둔다. 사지방 PC는 재부팅하면 초기화되므로 브라우저 저장소를 쓰지 않는다.
-let authToken: string | null = null
+// 토큰은 sessionStorage에 둔다. 새로고침·주소 직접 입력에도 로그인이 유지되고,
+// 탭이나 브라우저를 닫으면 지워져서 사지방처럼 같이 쓰는 PC에서 다음 사람에게 남지 않는다.
+// 저장소를 쓸 수 없는 환경(차단된 브라우저, 테스트)에서는 메모리에만 둔다.
+const TOKEN_KEY = 'bridge.token'
+
+function readStoredToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+let authToken: string | null = readStoredToken()
+const tokenListeners = new Set<() => void>()
 
 export function setAuthToken(token: string | null): void {
   authToken = token
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token)
+    else sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // 저장소를 못 쓰면 메모리 토큰만 쓴다 (새로고침하면 다시 로그인)
+  }
+  tokenListeners.forEach((listener) => listener())
 }
 
 export function getAuthToken(): string | null {
   return authToken
+}
+
+/** 로그인·로그아웃을 화면(메뉴 등)에 반영할 때 쓴다. useSyncExternalStore용 */
+export function subscribeAuthToken(listener: () => void): () => void {
+  tokenListeners.add(listener)
+  return () => tokenListeners.delete(listener)
 }
 
 /**
