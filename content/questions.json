@@ -167,6 +167,20 @@
     "answer": 3
   },
   {
+    "id": "q-recursion-3",
+    "concept": "recursion",
+    "type": "choice",
+    "prompt": "아래 함수에서 fib(6)의 값은?",
+    "code": "int fib(int n) {\n    if (n < 2) return n;\n    return fib(n - 1) + fib(n - 2);\n}",
+    "choices": [
+      "5",
+      "13",
+      "8",
+      "6"
+    ],
+    "answer": 2
+  },
+  {
     "id": "q-array-1",
     "concept": "array",
     "type": "choice",
@@ -219,6 +233,20 @@
       "20",
       "30",
       "a의 주소 + 1"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "q-pointer-3",
+    "concept": "pointer",
+    "type": "choice",
+    "prompt": "아래 코드를 실행하면 출력은?",
+    "code": "void swap(int *a, int *b) {\n    int t = *a;\n    *a = *b;\n    *b = t;\n}\n\nint x = 1, y = 2;\nswap(&x, &y);\nprintf(\"%d %d\", x, y);",
+    "choices": [
+      "1 2",
+      "2 1",
+      "2 2",
+      "컴파일 에러"
     ],
     "answer": 1
   },
@@ -438,6 +466,20 @@
     "answer": 0
   },
   {
+    "id": "q-linked_list-3",
+    "concept": "linked_list",
+    "type": "choice",
+    "prompt": "빈 리스트에 push_front로 1, 2, 3을 차례로 넣은 뒤 head->data의 값은?",
+    "code": "struct Node *push_front(struct Node *head, int x) {\n    struct Node *n = malloc(sizeof(struct Node));\n    n->data = x;\n    n->next = head;\n    return n;\n}",
+    "choices": [
+      "1",
+      "2",
+      "NULL",
+      "3"
+    ],
+    "answer": 3
+  },
+  {
     "id": "q-binary_tree-1",
     "concept": "binary_tree",
     "type": "choice",
@@ -516,6 +558,19 @@
     "answer": 1
   },
   {
+    "id": "q-bst-3",
+    "concept": "bst",
+    "type": "choice",
+    "prompt": "빈 이진 탐색 트리에 5, 3, 8, 1, 4를 차례로 넣었다. 4를 찾을 때 비교하는 노드 순서는?",
+    "choices": [
+      "5 → 3 → 4",
+      "5 → 8 → 4",
+      "1 → 3 → 4",
+      "5 → 3 → 1 → 4"
+    ],
+    "answer": 0
+  },
+  {
     "id": "q-graph-1",
     "concept": "graph",
     "type": "choice",
@@ -542,6 +597,19 @@
     "answer": 3
   },
   {
+    "id": "q-graph-3",
+    "concept": "graph",
+    "type": "choice",
+    "prompt": "간선이 0-1, 0-2, 1-3인 그래프를 0번부터 깊이 우선 탐색(DFS)한다. 인접한 정점은 번호가 작은 것부터 방문할 때 방문 순서는?",
+    "choices": [
+      "0 1 2 3",
+      "0 2 1 3",
+      "0 1 3 2",
+      "0 3 1 2"
+    ],
+    "answer": 2
+  },
+  {
     "id": "q-sorting-1",
     "concept": "sorting",
     "type": "choice",
@@ -563,6 +631,19 @@
       "O(log n)",
       "O(n)",
       "O(n log n)",
+      "O(n²)"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "q-sorting-3",
+    "concept": "sorting",
+    "type": "choice",
+    "prompt": "배열 n개를 병합 정렬할 때, 두 구간을 합치기 위해 추가로 필요한 임시 메모리 크기는?",
+    "choices": [
+      "O(1)",
+      "O(n)",
+      "O(log n)",
       "O(n²)"
     ],
     "answer": 1
