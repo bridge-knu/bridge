@@ -1,14 +1,18 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from sqlalchemy import select
 
-from app.api import mock_data
 from app.clock import today
-from app.models import CodeSnapshot, Profile, User
+from app.content import get_graph
+from app.models import CodeSnapshot, ConceptState, DiagnosisAnswer, Profile, User
+from app.models import PlanBlock as PlanBlockRow
+
+GRAPH = get_graph()
 
 
 @pytest.fixture
 def client(api_client, login):
-    mock_data.USERS.clear()
     api_client.headers["Authorization"] = f"Bearer {login('tester')}"
     return api_client
 
@@ -95,29 +99,62 @@ def test_demo_has_profile(api_client, db):
     assert row is not None and row.target_course == "DS"
 
 
-# ---- 진단 ----
+# ---- 진단 (실제 엔진) ----
+
+
+def answer(client, step, right: bool):
+    q = step["question"]
+    correct = GRAPH.questions[q["id"]].answer
+    wrong = (correct + 1) % len(q["choices"])
+    r = client.post("/diagnosis/answer", json={"questionId": q["id"], "choice": correct if right else wrong})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def finish_diagnosis(client, right: bool = True, step=None):
+    step = step or client.post("/diagnosis/start").json()
+    while not step["done"]:
+        step = answer(client, step, right)
+    return step
 
 
 def test_diagnosis_flow(client):
-    r = client.post("/diagnosis/start")
-    step = r.json()
+    step = client.post("/diagnosis/start").json()
     assert step["done"] is False
     assert step["correct"] is None
     assert step["answeredCount"] == 0
-    assert step["maxQuestions"] == 3
+    assert step["maxQuestions"] == 10
     assert "answer" not in step["question"]
+    assert step["question"]["conceptName"] == GRAPH.concepts[step["question"]["conceptId"]].name
 
-    q = step["question"]
-    step = client.post("/diagnosis/answer", json={"questionId": q["id"], "choice": 0}).json()
+    step = answer(client, step, right=True)
     assert step["correct"] is True
     assert step["answeredCount"] == 1
 
-    while not step["done"]:
-        q = step["question"]
-        step = client.post("/diagnosis/answer", json={"questionId": q["id"], "choice": 3}).json()
-    assert step["question"] is None
+    step = answer(client, step, right=False)
     assert step["correct"] is False
-    assert step["answeredCount"] == 3
+    step = finish_diagnosis(client, right=False, step=step)
+    assert step["question"] is None
+    assert step["answeredCount"] <= 10
+
+
+def test_all_wrong_goes_down_to_basics_within_10(client):
+    asked = []
+    step = client.post("/diagnosis/start").json()
+    while not step["done"]:
+        asked.append(step["question"]["conceptId"])
+        step = answer(client, step, right=False)
+    assert len(asked) <= 10
+    assert GRAPH.depth(asked[-1]) < GRAPH.depth(asked[0])  # 틀리면 더 기초로 내려간다
+
+
+def test_fresh_a_grade_has_no_questions(client):
+    # 공백 0개월 + A학점 → 문제가 거의 안 나옴 (C 개념은 모두 안다고 봄)
+    client.put("/profile", json={**PROFILE, "gapMonths": 0})
+    step = client.post("/diagnosis/start").json()
+    assert step["done"] is True
+    assert step["question"] is None
+    assert client.get("/diagnosis/result").status_code == 200
 
 
 def test_diagnosis_wrong_question_id(client):
@@ -127,11 +164,9 @@ def test_diagnosis_wrong_question_id(client):
     assert r.json() == {"detail": "지금 풀고 있는 문제가 아니에요", "code": "QUESTION_MISMATCH"}
 
 
-def finish_diagnosis(client):
-    step = client.post("/diagnosis/start").json()
-    while not step["done"]:
-        step = client.post("/diagnosis/answer", json={"questionId": step["question"]["id"], "choice": 0}).json()
-    return step
+def test_answer_without_start(client):
+    r = client.post("/diagnosis/answer", json={"questionId": "q-array-1", "choice": 0})
+    assert r.json()["code"] == "QUESTION_MISMATCH"
 
 
 def test_answer_after_finished(client):
@@ -154,16 +189,46 @@ def test_result_during_diagnosis(client):
 
 
 def test_diagnosis_result(client):
-    finish_diagnosis(client)
+    step = client.post("/diagnosis/start").json()
+    first = step["question"]["conceptId"]
+    finish_diagnosis(client, right=False, step=step)
     concepts = client.get("/diagnosis/result").json()["concepts"]
-    assert [c["id"] for c in concepts] == ["array", "pointer", "linked_list"]
+
+    ids = [c["id"] for c in concepts]
+    assert set(ids) == GRAPH.required_for_course("DS")
     for c in concepts:
         assert 0 <= c["mastery"] <= 1
         assert c["source"] in ("prior", "diagnosed")
-    assert concepts[1]["prereqs"] == ["array"]
+        assert c["prereqs"] == GRAPH.prereqs(c["id"])
+        for p in c["prereqs"]:
+            assert ids.index(p) < ids.index(c["id"])  # 선수 개념이 먼저
+    by_id = {c["id"]: c for c in concepts}
+    assert by_id[first]["mastery"] == 0.2
+    assert by_id[first]["source"] == "diagnosed"
 
 
-# ---- 플랜 ----
+def test_diagnosis_is_saved_in_db(client, db):
+    step = finish_diagnosis(client, right=False)
+    uid = user_id(db)
+    answers = db.scalars(select(DiagnosisAnswer).where(DiagnosisAnswer.user_id == uid)).all()
+    assert len(answers) == step["answeredCount"]
+    assert all(a.correct is False for a in answers)
+    states = db.scalars(select(ConceptState).where(ConceptState.user_id == uid)).all()
+    assert {s.concept_id for s in states} == GRAPH.required_for_course("DS")
+
+
+def test_demo_has_finished_diagnosis(api_client, login):
+    headers = {"Authorization": f"Bearer {login('demo', '0000')}"}
+    concepts = api_client.get("/diagnosis/result", headers=headers).json()["concepts"]
+    assert {c["source"] for c in concepts} == {"prior", "diagnosed"}
+    assert api_client.get("/plan", headers=headers).json()["days"]
+
+
+# ---- 플랜 (실제 엔진) ----
+
+
+def planned(plan):
+    return [b for d in plan["days"] for b in d["blocks"]]
 
 
 def test_plan_uses_daily_minutes(client):
@@ -171,9 +236,29 @@ def test_plan_uses_daily_minutes(client):
     plan = client.post("/plan/generate").json()
     assert plan["dailyMinutes"] == 60
     assert plan["returnDate"] == "2027-03-02"
-    assert [len(d["blocks"]) for d in plan["days"]] == [2, 1]
+    assert all(len(d["blocks"]) <= 2 for d in plan["days"])
+    assert [d["date"] for d in plan["days"]] == [
+        (today() + timedelta(days=i)).isoformat() for i in range(len(plan["days"]))
+    ]
     assert plan["todayRemainingMinutes"] == 60
     assert client.get("/plan").json() == plan
+
+
+def test_plan_puts_prereqs_first(client):
+    client.put("/profile", json=PROFILE)
+    order = [b["conceptId"] for b in planned(client.get("/plan").json())]
+    for i, cid in enumerate(order):
+        for p in GRAPH.ancestors(cid):
+            if p in order:
+                assert order.index(p) < i
+
+
+def test_plan_only_has_concepts_not_known(client):
+    finish_diagnosis(client, right=False)
+    mastery = {c["id"]: c["mastery"] for c in client.get("/diagnosis/result").json()["concepts"]}
+    blocks = planned(client.get("/plan").json())
+    assert blocks
+    assert {b["conceptId"] for b in blocks} == {c for c, m in mastery.items() if m < 0.6}
 
 
 def test_plan_has_no_deferred_when_time_is_enough(client):
@@ -184,22 +269,113 @@ def test_plan_has_no_deferred_when_time_is_enough(client):
 
 
 def test_plan_defers_concepts_when_time_is_short(client):
-    from datetime import timedelta
-
     tomorrow = (today() + timedelta(days=1)).isoformat()
     client.put("/profile", json={**PROFILE, "returnDate": tomorrow, "dailyMinutes": 30})  # 블록 1개만 가능
     plan = client.post("/plan/generate").json()
-    assert [b["blockId"] for d in plan["days"] for b in d["blocks"]] == ["b-array-1"]
-    assert plan["deferredConcepts"] == [
-        {"conceptId": "pointer", "conceptName": "포인터", "blocks": 1},
-        {"conceptId": "linked_list", "conceptName": "연결 리스트", "blocks": 1},
-    ]
-    assert plan["message"] == "시간이 부족해 포인터, 연결 리스트은(는) 복학 후로 미뤘어요"
+    assert len(planned(plan)) <= 1
+    assert plan["deferredConcepts"]
+    names = ", ".join(d["conceptName"] for d in plan["deferredConcepts"])
+    assert plan["message"] == f"시간이 부족해 {names}은(는) 복학 후로 미뤘어요"
+    assert client.get("/plan").json()["deferredConcepts"] == plan["deferredConcepts"]
+
+
+def test_plan_is_saved_in_db(client, db):
+    plan = client.get("/plan").json()
+    rows = db.scalars(select(PlanBlockRow).where(PlanBlockRow.user_id == user_id(db))).all()
+    assert sorted(r.block_id for r in rows) == sorted(b["blockId"] for b in planned(plan))
+
+
+def test_profile_change_rebuilds_plan(client):
+    client.put("/profile", json=PROFILE)
+    assert client.get("/plan").json()["dailyMinutes"] == 60
+    client.put("/profile", json={**PROFILE, "dailyMinutes": 90})
+    plan = client.get("/plan").json()
+    assert plan["dailyMinutes"] == 90
+    assert len(plan["days"][0]["blocks"]) == 3
+
+
+def test_finishing_diagnosis_rebuilds_plan(client):
+    before = planned(client.get("/plan").json())
+    finish_diagnosis(client, right=True)  # 다 맞히면 배울 개념이 줄어든다
+    after = planned(client.get("/plan").json())
+    assert len(after) < len(before)
+
+
+def test_regenerate_keeps_done_blocks(client):
+    client.put("/profile", json=PROFILE)
+    client.get("/plan")
+    client.post("/blocks/b-array-1/complete")
+    plan = client.post("/plan/generate").json()
+    assert {b["blockId"]: b["done"] for b in planned(plan)}["b-array-1"] is True
+
+
+def pass_days(db, n=1):
+    """저장된 플랜을 n일 전에 만든 것처럼 날짜를 당긴다 (하루가 지난 상황)."""
+    db.expire_all()
+    rows = db.scalars(select(PlanBlockRow).where(PlanBlockRow.user_id == user_id(db))).all()
+    for r in rows:  # (user, date, order) 유일 제약에 걸리지 않게 멀리 옮겼다가 다시 옮긴다
+        r.date -= timedelta(days=1000)
+    db.flush()
+    for r in rows:
+        r.date += timedelta(days=1000 - n)
+        if r.done_at:
+            r.done_at -= timedelta(days=n)
+    db.flush()
+
+
+def test_plan_moves_to_today_when_day_passes(client, db):
+    client.put("/profile", json=PROFILE)
+    before = planned(client.get("/plan").json())
+    first = next(b["blockId"] for b in before if b["blockId"] in GRAPH.blocks)
+    client.post(f"/blocks/{first}/complete")
+    pass_days(db, 30)  # 플랜 전체가 지난 날짜가 되게
+
+    plan = client.get("/plan").json()
+    now = today().isoformat()
+    past = [b for d in plan["days"] if d["date"] < now for b in d["blocks"]]
+    assert [(b["blockId"], b["done"]) for b in past] == [(first, True)]  # 끝낸 블록은 그 날짜에 기록으로
+    upcoming = [d for d in plan["days"] if d["date"] >= now]
+    assert upcoming[0]["date"] == now  # 안 끝낸 블록은 오늘부터 다시
+    assert len(upcoming[0]["blocks"]) == 2
+    assert not any(b["done"] for d in upcoming for b in d["blocks"])
+    assert sorted(b["blockId"] for b in planned(plan)) == sorted(b["blockId"] for b in before)
+    assert plan["todayRemainingMinutes"] == 60
+    assert client.get("/plan").json() == plan  # 한 번 옮기면 그대로
+
+
+def test_plan_moves_even_if_nothing_done(client, db):
+    client.put("/profile", json=PROFILE)
+    before = planned(client.get("/plan").json())
+    pass_days(db, 3)
+    plan = client.get("/plan").json()
+    assert plan["days"][0]["date"] == today().isoformat()
+    assert [b["blockId"] for b in planned(plan)] == [b["blockId"] for b in before]
+
+
+def test_finished_concept_is_not_planned_again(client, db):
+    client.put("/profile", json=PROFILE)
+    blocks = planned(client.get("/plan").json())
+    by_concept: dict[str, list[str]] = {}
+    for b in blocks:
+        by_concept.setdefault(b["conceptId"], []).append(b["blockId"])
+    concept, ids = next(
+        ((c, ids) for c, ids in by_concept.items() if all(i in GRAPH.blocks for i in ids)), (None, [])
+    )
+    if concept is None:
+        pytest.skip("블록 내용이 다 있는 개념이 없음 (content/blocks.json)")
+    for bid in ids:
+        client.post(f"/blocks/{bid}/complete")
+    pass_days(db, 30)
+    plan = client.post("/plan/generate").json()
+    now = today().isoformat()
+    past = [b for d in plan["days"] if d["date"] < now for b in d["blocks"]]
+    assert sorted(b["blockId"] for b in past) == sorted(ids)
+    upcoming = [b for d in plan["days"] if d["date"] >= now for b in d["blocks"]]
+    assert concept not in {b["conceptId"] for b in upcoming}
+    assert len(upcoming) == len(blocks) - len(ids)
 
 
 def test_plan_today_is_korean_date(client):
-    from datetime import datetime, timedelta, timezone
-
     plan = client.get("/plan").json()
     assert plan["today"] == today().isoformat()
     assert today() == (datetime.now(timezone.utc) + timedelta(hours=9)).date()
@@ -217,6 +393,7 @@ def test_today_remaining_is_daily_minus_done_today(client):
 
 def test_today_remaining_never_negative(client):
     client.put("/profile", json={**PROFILE, "dailyMinutes": 30})
+    client.get("/plan")
     client.post("/blocks/b-array-1/complete")
     client.post("/blocks/b-pointer-1/complete")
     assert client.get("/plan").json()["todayRemainingMinutes"] == 0
@@ -224,8 +401,9 @@ def test_today_remaining_never_negative(client):
 
 def test_plan_without_profile(client):
     plan = client.get("/plan").json()
+    assert plan["dailyMinutes"] == 60
     assert len(plan["days"]) >= 1
-    assert plan["days"][0]["blocks"][0]["blockId"] == "b-array-1"
+    assert plan["days"][0]["date"] == today().isoformat()
 
 
 # ---- 블록·자동 저장 ----
@@ -297,24 +475,32 @@ def test_save_code_unknown_block_has_code(client):
 
 
 def test_complete_block(client):
-    r = client.post("/blocks/b-array-1/complete", json={"checkAnswers": [{"questionId": "q-array-2", "choice": 1}]})
-    body = r.json()
+    ids = [b["blockId"] for b in planned(client.get("/plan").json())]
+    check = GRAPH.blocks["b-array-1"].check
+    answers = [{"questionId": q, "choice": GRAPH.questions[q].answer} for q in check]
+    body = client.post("/blocks/b-array-1/complete", json={"checkAnswers": answers}).json()
     assert body == {
         "blockId": "b-array-1",
         "done": True,
-        "correctCount": 1,
-        "totalCount": 1,
-        "nextBlockId": "b-pointer-1",
+        "correctCount": len(check),
+        "totalCount": len(check),
+        "nextBlockId": ids[ids.index("b-array-1") + 1],
     }
     assert client.get("/blocks/b-array-1").json()["done"] is True
-    assert client.get("/plan").json()["days"][0]["blocks"][0]["done"] is True
+    assert {b["blockId"]: b["done"] for b in planned(client.get("/plan").json())}["b-array-1"] is True
+
+
+def test_complete_is_per_user(client, login):
+    client.get("/plan")
+    client.post("/blocks/b-array-1/complete")
+    other = {"Authorization": f"Bearer {login('other')}"}
+    assert client.get("/blocks/b-array-1", headers=other).json()["done"] is False
 
 
 def test_complete_without_body(client):
-    r = client.post("/blocks/b-linked_list-1/complete")
+    r = client.post("/blocks/b-array-1/complete")
     assert r.status_code == 200
     assert r.json()["correctCount"] == 0
-    assert r.json()["nextBlockId"] is None
 
 
 def test_all_12_endpoints_in_docs(client):
