@@ -309,6 +309,72 @@ def test_regenerate_keeps_done_blocks(client):
     assert {b["blockId"]: b["done"] for b in planned(plan)}["b-array-1"] is True
 
 
+def pass_days(db, n=1):
+    """저장된 플랜을 n일 전에 만든 것처럼 날짜를 당긴다 (하루가 지난 상황)."""
+    db.expire_all()
+    rows = db.scalars(select(PlanBlockRow).where(PlanBlockRow.user_id == user_id(db))).all()
+    for r in rows:  # (user, date, order) 유일 제약에 걸리지 않게 멀리 옮겼다가 다시 옮긴다
+        r.date -= timedelta(days=1000)
+    db.flush()
+    for r in rows:
+        r.date += timedelta(days=1000 - n)
+        if r.done_at:
+            r.done_at -= timedelta(days=n)
+    db.flush()
+
+
+def test_plan_moves_to_today_when_day_passes(client, db):
+    client.put("/profile", json=PROFILE)
+    before = planned(client.get("/plan").json())
+    first = next(b["blockId"] for b in before if b["blockId"] in GRAPH.blocks)
+    client.post(f"/blocks/{first}/complete")
+    pass_days(db, 30)  # 플랜 전체가 지난 날짜가 되게
+
+    plan = client.get("/plan").json()
+    now = today().isoformat()
+    past = [b for d in plan["days"] if d["date"] < now for b in d["blocks"]]
+    assert [(b["blockId"], b["done"]) for b in past] == [(first, True)]  # 끝낸 블록은 그 날짜에 기록으로
+    upcoming = [d for d in plan["days"] if d["date"] >= now]
+    assert upcoming[0]["date"] == now  # 안 끝낸 블록은 오늘부터 다시
+    assert len(upcoming[0]["blocks"]) == 2
+    assert not any(b["done"] for d in upcoming for b in d["blocks"])
+    assert sorted(b["blockId"] for b in planned(plan)) == sorted(b["blockId"] for b in before)
+    assert plan["todayRemainingMinutes"] == 60
+    assert client.get("/plan").json() == plan  # 한 번 옮기면 그대로
+
+
+def test_plan_moves_even_if_nothing_done(client, db):
+    client.put("/profile", json=PROFILE)
+    before = planned(client.get("/plan").json())
+    pass_days(db, 3)
+    plan = client.get("/plan").json()
+    assert plan["days"][0]["date"] == today().isoformat()
+    assert [b["blockId"] for b in planned(plan)] == [b["blockId"] for b in before]
+
+
+def test_finished_concept_is_not_planned_again(client, db):
+    client.put("/profile", json=PROFILE)
+    blocks = planned(client.get("/plan").json())
+    by_concept: dict[str, list[str]] = {}
+    for b in blocks:
+        by_concept.setdefault(b["conceptId"], []).append(b["blockId"])
+    concept, ids = next(
+        ((c, ids) for c, ids in by_concept.items() if all(i in GRAPH.blocks for i in ids)), (None, [])
+    )
+    if concept is None:
+        pytest.skip("블록 내용이 다 있는 개념이 없음 (content/blocks.json)")
+    for bid in ids:
+        client.post(f"/blocks/{bid}/complete")
+    pass_days(db, 30)
+    plan = client.post("/plan/generate").json()
+    now = today().isoformat()
+    past = [b for d in plan["days"] if d["date"] < now for b in d["blocks"]]
+    assert sorted(b["blockId"] for b in past) == sorted(ids)
+    upcoming = [b for d in plan["days"] if d["date"] >= now for b in d["blocks"]]
+    assert concept not in {b["conceptId"] for b in upcoming}
+    assert len(upcoming) == len(blocks) - len(ids)
+
+
 def test_plan_today_is_korean_date(client):
     plan = client.get("/plan").json()
     assert plan["today"] == today().isoformat()

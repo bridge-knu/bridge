@@ -2,6 +2,7 @@
 
 - 이해도: 진단을 끝냈으면 concept_states, 아니면 프로필로 망각 추정한 값
 - 플랜이 없으면(처음, 프로필 변경, 진단 다시 끝냄) GET /plan이 새로 만든다
+- 날이 바뀌어 지난 날짜에 안 끝낸 블록이 있어도 GET /plan이 오늘부터 다시 배치한다
 - 다시 만들어도 이미 끝낸 블록은 완료 표시를 유지한다
 """
 
@@ -60,30 +61,57 @@ def plan_rows(db: Session, user_id: int) -> list[PlanBlockRow]:
 
 
 def generate_plan(db: Session, user_id: int) -> None:
-    return_date, daily = plan_settings(db, user_id)
-    result = engine.build_plan(current_mastery(db, user_id), get_graph(), today(), return_date, daily)
+    """오늘부터 다시 배치한다.
 
-    done_before = {r.block_id: r.done_at for r in plan_rows(db, user_id) if r.done}
-    db.execute(delete(PlanBlockRow).where(PlanBlockRow.user_id == user_id))
+    - 어제까지 끝낸 블록은 그 날짜에 기록으로 남기고 새 배치에서 뺀다
+    - 블록을 다 끝낸 개념은 배울 개념에서 뺀다 (남은 시간을 끝낸 개념에 쓰지 않게)
+    - 오늘 끝낸 블록은 새 배치에서도 완료 표시를 유지한다
+    """
+    graph = get_graph()
+    now = today()
+    return_date, daily = plan_settings(db, user_id)
+    rows = plan_rows(db, user_id)
+    history = [r for r in rows if r.done and r.date < now]
+    history_ids = {r.block_id for r in history}
+    done_now = {r.block_id: r.done_at for r in rows if r.done and r.date >= now}
+
+    mastery = current_mastery(db, user_id)
+    for concept_id in mastery:
+        if concept_id in graph.concepts and set(engine.block_ids_for(graph, concept_id)) <= history_ids:
+            mastery[concept_id] = max(mastery[concept_id], engine.LEARN_THRESHOLD)
+    result = engine.build_plan(mastery, graph, now, return_date, daily)
+
+    # 엔진 순서는 그대로 두고, 어제까지 끝낸 블록만 빼서 오늘부터 다시 채운다
+    ordered = [b.block_id for day in result.days for b in day.blocks if b.block_id not in history_ids]
+    per_day = max(daily // engine.BLOCK_MINUTES, 1)
+
+    db.execute(delete(PlanBlockRow).where(PlanBlockRow.user_id == user_id, PlanBlockRow.id.not_in([r.id for r in history])))
     db.execute(delete(PlanInfo).where(PlanInfo.user_id == user_id))
     db.flush()
-    for day in result.days:
-        for b in day.blocks:
-            db.add(
-                PlanBlockRow(
-                    user_id=user_id,
-                    date=day.date,
-                    order=b.order,
-                    block_id=b.block_id,
-                    done=b.block_id in done_before,
-                    done_at=done_before.get(b.block_id),
-                )
+    for i, block_id in enumerate(ordered):
+        db.add(
+            PlanBlockRow(
+                user_id=user_id,
+                date=now + timedelta(days=i // per_day),
+                order=i % per_day + 1,
+                block_id=block_id,
+                done=block_id in done_now,
+                done_at=done_now.get(block_id),
             )
+        )
     deferred = [
         {"concept_id": d.concept_id, "concept_name": d.concept_name, "blocks": d.blocks} for d in result.deferred
     ]
     db.add(PlanInfo(user_id=user_id, deferred=deferred))
     db.commit()
+
+
+def has_overdue(db: Session, user_id: int) -> bool:
+    """어제까지 날짜인데 안 끝낸 블록이 있으면 True (날이 바뀌면 오늘부터 다시 배치)."""
+    stmt = select(PlanBlockRow.id).where(
+        PlanBlockRow.user_id == user_id, PlanBlockRow.date < today(), PlanBlockRow.done.is_(False)
+    )
+    return db.scalars(stmt.limit(1)).first() is not None
 
 
 def read_plan(db: Session, user_id: int) -> Plan:
@@ -145,9 +173,9 @@ def generate(user: User = Depends(get_current_user), db: Session = Depends(get_d
     "",
     response_model=Plan,
     summary="날짜별 블록 목록, 오늘 남은 시간",
-    description="플랜이 없거나 프로필·진단이 바뀌었으면 새로 만들어서 준다.",
+    description="플랜이 없거나 프로필·진단이 바뀌었거나 지난 날짜에 안 끝낸 블록이 있으면 오늘부터 새로 만들어서 준다.",
 )
 def get_plan(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if db.get(PlanInfo, user.id) is None:
+    if db.get(PlanInfo, user.id) is None or has_overdue(db, user.id):
         generate_plan(db, user.id)
     return read_plan(db, user.id)
