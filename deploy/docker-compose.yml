@@ -1,0 +1,100 @@
+# 배포용 구성. 서버에서 deploy/ 폴더 안에서 실행한다 (deploy/README.md 참고).
+#   docker compose up -d --build
+# 개발용(저장소 루트의 docker-compose.yml)과 다른 점
+# - web(Caddy): 화면 파일을 내보내고 /api 요청을 backend로 넘긴다. HTTPS 인증서는 자동 발급
+# - db, redis, backend 포트는 서버 밖으로 열지 않는다 (80, 443만 연다)
+# - 코드 자동 반영(--reload)과 소스 마운트 없음, 서버가 재부팅돼도 다시 뜬다
+name: bridge-prod
+
+x-restart: &restart
+  restart: unless-stopped
+  # 로그가 디스크를 채우지 않게 컨테이너마다 10MB × 3개까지만 남긴다
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  db:
+    <<: *restart
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    <<: *restart
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    <<: *restart
+    build: ../backend
+    env_file: .env
+    environment:
+      CONTENT_DIR: /app/content
+      DISABLE_DOCS: "1"
+    volumes:
+      - ../content:/app/content:ro
+    # Caddy가 넘겨준 실제 접속 IP를 쓴다 (IP별 로그인 제한용). backend는 Caddy만 접근할 수 있다
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  sandbox:
+    build: ../sandbox
+    image: bridge-sandbox
+    entrypoint: ["true"]
+
+  worker:
+    <<: *restart
+    build: ../backend
+    # 워커는 Docker를 다룰 수 있어서 침해되면 위험하다. .env 대신 꼭 필요한 값만 넘긴다 (DB 비밀번호·JWT 키 없음)
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      SANDBOX_IMAGE: bridge-sandbox
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python -m app.worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      sandbox:
+        condition: service_completed_successfully
+
+  web:
+    <<: *restart
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,13 @@
+# 화면(frontend)을 빌드해서 Caddy로 내보낸다. 빌드 위치는 저장소 루트
+# (개념 그래프 화면이 content/blocks.json을 빌드에 넣기 때문).
+FROM node:22.12.0-alpine AS build
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+COPY content/ /app/content/
+RUN npm run build
+
+FROM caddy:2.8.4-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/frontend/dist /srv

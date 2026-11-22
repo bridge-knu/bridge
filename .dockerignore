@@ -1,0 +1,10 @@
+# deploy/Dockerfile.web 이 저장소 루트를 빌드 위치로 쓴다. 필요 없는 파일은 보내지 않는다.
+.git
+.env
+**/.env
+**/node_modules
+frontend/dist
+backend
+sandbox
+docs
+**/__pycache__
