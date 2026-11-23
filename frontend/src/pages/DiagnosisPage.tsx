@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, getDiagnosisResult, setAuthToken } from '../api.ts'
 import { classifyDiagnosisError } from '../diagnosis/errors.ts'
+import { finishReason, progressLabel } from '../diagnosis/finish.ts'
 import { diagnosisReason, reasonTone, type ReasonTone } from '../diagnosis/reason.ts'
 import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
@@ -38,6 +39,8 @@ export default function DiagnosisPage() {
   const [reason, setReason] = useState<{ text: string; tone: ReasonTone } | null>(null)
   // "다시 진단하기"로 시작했는지. 이때 서버가 막으면 완료 화면 대신 막힌 이유를 보여 준다
   const restarting = useRef(false)
+  // 이번 진단에서 맞힌 문제 수 (완료 화면에서 일찍 끝난 이유를 고르는 데 쓴다)
+  const [correctCount, setCorrectCount] = useState(0)
   const [restartBlocked, setRestartBlocked] = useState(false)
 
   useEffect(() => {
@@ -67,6 +70,8 @@ export default function DiagnosisPage() {
       const prev = isStart ? null : (step?.question ?? null)
       const next = await load()
       const correct = isStart ? null : next.correct
+      if (isStart) setCorrectCount(0)
+      else if (correct) setCorrectCount((c) => c + 1)
       const text = diagnosisReason({ prev, correct, next: next.question })
       setReason(text ? { text, tone: reasonTone(correct) } : null)
       setStep(next)
@@ -174,6 +179,12 @@ export default function DiagnosisPage() {
       <section className="form-page">
         <h1>진단 완료</h1>
         <p className="form-hint">수고했어요. 결과 화면에서 아는 개념과 보충할 개념을 확인해 보세요.</p>
+        {/* 이번에 진단을 끝까지 푼 경우만 (이미 끝난 진단으로 들어오면 step이 없다) */}
+        {step && !step.question && (
+          <p className="diagnosis-reason" role="status">
+            {finishReason({ answered: step.number, max: step.total, correct: correctCount })}
+          </p>
+        )}
         <div className="form">
           <button type="button" onClick={() => navigate('/result')}>
             결과 보기
@@ -188,10 +199,8 @@ export default function DiagnosisPage() {
   return (
     <section className="form-page">
       <div className="diagnosis-progress">
-        <span>
-          문제 {number} / {total}
-        </span>
-        <progress value={number} max={total} aria-label="진단 진행률" />
+        <span>{progressLabel(number, total)}</span>
+        <progress value={number} max={total} aria-label={`진단 진행: ${progressLabel(number, total)}`} />
       </div>
 
       {reason && (
