@@ -187,7 +187,12 @@ export default function ResultPage() {
       {weakCount > 0 && (
         // 그래프가 길어서 휴대폰 첫 화면엔 보충할 개념이 안 보인다. 위쪽에 바로가기로 먼저 보여 준다
         <nav className="weak-shortcuts" aria-label="보충할 개념 바로가기">
-          <p className="weak-shortcuts-title">보충할 개념 · 누르면 그 학습 블록으로 가요</p>
+          <p className="weak-shortcuts-title">
+            보충할 개념
+            {/* 휴대폰에선 칩이 한 줄이라 옆으로 밀 수 있다는 걸 글로 알려 준다. 두 문구 중 하나만 CSS로 보인다 */}
+            <span className="weak-shortcuts-desc"> · 누르면 그 학습 블록으로 가요</span>
+            <span className="weak-shortcuts-more"> · 옆으로 밀어서 {weakCount}개 모두 보기</span>
+          </p>
           <ul>
             {weakNodes.map((n) => (
               <li key={n.id}>
@@ -218,11 +223,17 @@ export default function ResultPage() {
             !
           </span> 보충할 개념 (60% 미만)
         </li>
-        <li
-          className="concept-legend-source"
-          title="진단 확인: 진단 문제로 확인한 개념 (위 개념을 맞히면 그 바탕 개념도 함께 확인돼요). 추정: 이수 성적과 공백 기간으로 추정한 개념."
-        >
-          진단 확인 {diagnosedCount} · 추정 {graph.nodes.length - diagnosedCount}
+        {/* title 말풍선은 휴대폰에서 안 보여서, 눌러서 펼치는 설명으로 둔다 */}
+        <li className="concept-legend-source">
+          <details>
+            <summary>
+              진단 확인 {diagnosedCount} · 추정 {graph.nodes.length - diagnosedCount}
+            </summary>
+            <p>
+              <strong>진단 확인</strong>은 진단 문제로 확인한 개념이에요. 위 개념을 맞히면 그 바탕 개념도 함께 확인돼요.{' '}
+              <strong>추정</strong>은 이수 성적과 공백 기간으로 추정한 개념이에요.
+            </p>
+          </details>
         </li>
       </ul>
       {!graphWhole && (
