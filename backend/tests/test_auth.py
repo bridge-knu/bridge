@@ -423,3 +423,22 @@ def test_startup_restores_changed_demo_profile(api_client, db, login):
     plan = api_client.get("/plan", headers=headers).json()
     assert (plan["returnDate"], plan["dailyMinutes"]) == ("2027-03-02", 60)
     assert all(len(d["blocks"]) <= 2 for d in plan["days"])  # 하루 60분 = 30분 블록 2개로 다시 배치
+
+
+def test_startup_clears_demo_done_blocks_and_saved_code(api_client, db, login):
+    from app.seed import ensure_demo_user
+
+    headers = auth_header(login("demo", "0000"))
+    block_id = api_client.get("/plan", headers=headers).json()["days"][0]["blocks"][0]["blockId"]
+    # 앞사람이 demo로 블록을 끝내고 코드를 저장해 둔 상태
+    assert api_client.put(f"/code/{block_id}", json={"code": "int main(void) { return 0; }"}, headers=headers).status_code == 200
+    api_client.post(f"/blocks/{block_id}/complete", headers=headers)
+    plan = api_client.get("/plan", headers=headers).json()
+    assert plan["todayRemainingMinutes"] == 30
+
+    ensure_demo_user(db)  # 서버 재시작
+    plan = api_client.get("/plan", headers=headers).json()
+    assert plan["todayRemainingMinutes"] == 60
+    assert not any(b["done"] for d in plan["days"] for b in d["blocks"])
+    block = api_client.get(f"/blocks/{block_id}", headers=headers).json()
+    assert block["savedCode"] is None and block["done"] is False

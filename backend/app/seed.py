@@ -1,7 +1,8 @@
 """심사위원용 데모 계정.
 
-- 공용 데모 계정(demo / 0000): 서버가 시작할 때 없으면 만들고, 프로필은 항상 데모 값으로 되돌리고,
-  진단이 중간에 멈춰 있으면 다시 채운다. 프로필 저장·진단 다시 시작은 API에서 막는다.
+- 공용 데모 계정(demo / 0000): 서버가 시작할 때 없으면 만들고, 처음 상태로 되돌린다.
+  (프로필은 데모 값으로, 블록 완료 표시·저장한 코드는 지우고, 진단이 중간에 멈춰 있으면 다시 채움)
+  프로필 저장·진단 다시 시작은 API에서 막는다. 블록 완료·코드 저장은 체험에 필요해서 막지 않는다.
 - 체험 계정(demo-xxxxxx): 로그인 화면의 "체험하기"를 누를 때마다 새로 만든다.
   여러 명이 demo 하나를 같이 쓰면 한 명이 진단을 다시 할 때 다른 사람 결과도 바뀌기 때문이다.
 
@@ -20,7 +21,7 @@ from app.api.deps import DEMO_LOGIN_ID
 from app.api.diagnosis import engine_profile, load_state, save_state
 from app.content import get_graph
 from app.engine import diagnosis as engine
-from app.models import PlanInfo, Profile, User
+from app.models import CodeSnapshot, PlanBlock, PlanInfo, Profile, User
 from app.security import hash_pin
 
 DEMO_PIN = "0000"
@@ -54,6 +55,7 @@ def ensure_demo_user(db: Session) -> None:
         db.add(user)
         db.flush()
     reset_demo_profile(db, user.id)
+    reset_demo_activity(db, user.id)
     fill_demo_data(db, user.id)
     db.commit()
 
@@ -65,6 +67,18 @@ def reset_demo_profile(db: Session, user_id: int) -> None:
         return
     for k, v in DEMO_PROFILE.items():
         setattr(row, k, v)
+    db.execute(delete(PlanInfo).where(PlanInfo.user_id == user_id))
+    db.flush()
+
+
+def reset_demo_activity(db: Session, user_id: int) -> None:
+    """공용 demo에 남은 블록 완료 표시와 저장한 코드를 지운다.
+
+    다음 사람이 "완료", "오늘 남은 시간 0분"이나 남이 쓴 코드(정답일 수도 있음)를 보지 않게 한다.
+    플랜은 다음 GET /plan에서 오늘부터 새로 만든다.
+    """
+    db.execute(delete(CodeSnapshot).where(CodeSnapshot.user_id == user_id))
+    db.execute(delete(PlanBlock).where(PlanBlock.user_id == user_id))
     db.execute(delete(PlanInfo).where(PlanInfo.user_id == user_id))
     db.flush()
 
