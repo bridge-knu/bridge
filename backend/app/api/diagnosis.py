@@ -10,7 +10,7 @@ from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import DEMO_LOGIN_ID, get_current_user
 from app.api.errors import ApiError, responses
 from app.api.profile import load_profile
 from app.api.schemas import (
@@ -26,9 +26,6 @@ from app.db import get_db
 from app.engine import diagnosis as engine
 from app.engine.graph import Graph
 from app.models import ConceptState, DiagnosisAnswer, DiagnosisSession, PlanInfo, User
-
-# 공용 데모 계정 아이디 (app.seed가 이 값으로 만든다)
-DEMO_LOGIN_ID = "demo"
 
 router = APIRouter(prefix="/diagnosis", tags=["diagnosis"])
 

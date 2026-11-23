@@ -9,6 +9,10 @@ from app.db import get_db
 from app.models import User
 from app.security import read_token
 
+# 공용 데모 계정 아이디 (app.seed가 이 값으로 만든다).
+# 여러 명이 같이 쓰므로 프로필 저장·진단 다시 시작을 막는다. 체험 계정(demo-xxxxxx)은 막지 않는다.
+DEMO_LOGIN_ID = "demo"
+
 # /docs 오른쪽 위 Authorize 버튼에 토큰을 넣으면 모든 요청에 붙는다.
 bearer = HTTPBearer(auto_error=False, description="/auth/login 으로 받은 token")
 
