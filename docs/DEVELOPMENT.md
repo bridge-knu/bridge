@@ -55,6 +55,7 @@ docs/           개발 문서
 | GET | /health | 서버 상태 확인 |
 | POST | /auth/login | 아이디 + PIN → 토큰 (없는 아이디면 가입) |
 | POST | /auth/demo | 데모 데이터를 채운 체험 계정(demo-xxxxxx)을 새로 만들고 토큰 반환 |
+| GET | /profile | 저장된 프로필 (아직 입력 전이면 404) |
 | PUT | /profile | 이수 과목·공백·복학일·하루 시간 저장 |
 | POST | /diagnosis/start | 진단 시작, 첫 문제 반환 |
 | POST | /diagnosis/answer | 답 제출 → 다음 문제 또는 종료 |
@@ -79,6 +80,7 @@ docs/           개발 문서
 | DIAGNOSIS_FINISHED | 400 | 진단이 이미 끝났어요 | 끝난 진단에 답 제출 |
 | QUESTION_MISMATCH | 400 | 지금 풀고 있는 문제가 아니에요 | 현재 문제가 아닌 questionId로 답 제출 |
 | DIAGNOSIS_NOT_FINISHED | 400 | 진단을 먼저 끝내 주세요 | 진단을 시작하지 않았거나 끝내기 전에 결과 요청 |
+| PROFILE_NOT_FOUND | 404 | 아직 프로필을 입력하지 않았어요 | 프로필 저장 전에 GET /profile |
 | BLOCK_NOT_FOUND | 404 | 블록을 찾을 수 없어요 | 없는 블록 |
 | JOB_NOT_FOUND | 404 | 실행 작업을 찾을 수 없어요 | 없거나 다른 사용자의 실행 작업 |
 | SERVICE_UNAVAILABLE | 503 | 잠시 후 다시 시도해 주세요 | DB·Redis에 연결할 수 없음, 코드 실행 대기열이 가득 참 |
