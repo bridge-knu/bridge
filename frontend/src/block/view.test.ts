@@ -3,6 +3,7 @@ import { ApiError } from '../api.ts'
 import {
   checkFeedback,
   choiceMark,
+  gradingStale,
   classifyBlockError,
   editorLanguage,
   errorText,
@@ -80,10 +81,19 @@ describe('확인 문제 채점 표시', () => {
     expect(choiceMark(undefined, 0)).toBeNull()
   })
 
-  it('문제 아래 문구', () => {
-    expect(checkFeedback(right)).toBe('정답이에요.')
-    expect(checkFeedback(wrong)).toBe('틀렸어요. 정답은 4번이에요.')
-    expect(checkFeedback(blank)).toBe('답하지 않았어요. 정답은 2번이에요.')
+  it('문제 아래 문구: 보기에 번호가 없으니 정답은 보기 내용으로', () => {
+    const choices = ['&ptr.age', 'ptr.age', '*ptr.age', 'ptr->age']
+    expect(checkFeedback(right, choices)).toBe('정답이에요.')
+    expect(checkFeedback(wrong, choices)).toBe('틀렸어요. 정답: ‘ptr->age’')
+    expect(checkFeedback(blank, choices)).toBe('답하지 않았어요. 정답: ‘ptr.age’')
+    // 보기 목록이 모자라면 몇 번째인지로
+    expect(checkFeedback(wrong, [])).toBe('틀렸어요. 정답: 4번째 보기')
+  })
+
+  it('답을 바꿔 표시가 지워진 문제가 있으면 맞힌 개수가 예전 값', () => {
+    expect(gradingStale([wrong, right], { 'q-a': wrong, 'q-b': right })).toBe(false)
+    expect(gradingStale([wrong, right], { 'q-b': right })).toBe(true)
+    expect(gradingStale(undefined, {})).toBe(false)
   })
 
   it('채점 결과를 문제 id로 묶는다 (results가 없는 응답도 빈 객체)', () => {

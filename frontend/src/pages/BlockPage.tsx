@@ -17,6 +17,7 @@ import { embedUrl, formatSeconds } from '../block/video.ts'
 import {
   checkFeedback,
   choiceMark,
+  gradingStale,
   classifyBlockError,
   editorLanguage,
   errorText,
@@ -390,7 +391,7 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
                   </div>
                   {graded[q.id] && (
                     <p className={`check-feedback ${graded[q.id].correct ? 'known' : 'gap'}`}>
-                      {checkFeedback(graded[q.id])}
+                      {checkFeedback(graded[q.id], q.choices)}
                     </p>
                   )}
                 </fieldset>
@@ -405,7 +406,9 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
           <p className="run-status success" role="status">
             블록을 완료했어요
             {completeResult.totalCount > 0 &&
-              ` · 확인 문제 ${completeResult.totalCount}개 중 ${completeResult.correctCount}개 정답`}
+              (gradingStale(completeResult.results, graded)
+                ? ' · 답을 바꿨어요. 다시 제출하면 새로 채점해요'
+                : ` · 확인 문제 ${completeResult.totalCount}개 중 ${completeResult.correctCount}개 정답`)}
           </p>
         )}
         {completeError && (
