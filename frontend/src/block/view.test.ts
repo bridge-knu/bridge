@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../api.ts'
-import { classifyBlockError, editorLanguage, errorText, initialCode, toCheckAnswers } from './view.ts'
+import {
+  checkFeedback,
+  choiceMark,
+  classifyBlockError,
+  editorLanguage,
+  errorText,
+  initialCode,
+  resultsById,
+  toCheckAnswers,
+} from './view.ts'
 
 const practice = { lang: 'c' as const, starter: '#include <stdio.h>\n', expected: '15\n' }
 
@@ -55,5 +64,30 @@ describe('toCheckAnswers: 확인 문제 답', () => {
       { questionId: 'q-c', choice: 0 },
     ])
     expect(toCheckAnswers(['q-a'], {})).toEqual([])
+  })
+})
+
+describe('확인 문제 채점 표시', () => {
+  const wrong = { questionId: 'q-a', choice: 0, answer: 3, correct: false }
+  const right = { questionId: 'q-b', choice: 2, answer: 2, correct: true }
+  const blank = { questionId: 'q-c', choice: null, answer: 1, correct: false }
+
+  it('정답 보기는 answer, 내가 고른 오답은 wrong, 나머지는 표시 없음', () => {
+    expect(choiceMark(wrong, 3)).toBe('answer')
+    expect(choiceMark(wrong, 0)).toBe('wrong')
+    expect(choiceMark(wrong, 1)).toBeNull()
+    expect(choiceMark(right, 2)).toBe('answer')
+    expect(choiceMark(undefined, 0)).toBeNull()
+  })
+
+  it('문제 아래 문구', () => {
+    expect(checkFeedback(right)).toBe('정답이에요.')
+    expect(checkFeedback(wrong)).toBe('틀렸어요. 정답은 4번이에요.')
+    expect(checkFeedback(blank)).toBe('답하지 않았어요. 정답은 2번이에요.')
+  })
+
+  it('채점 결과를 문제 id로 묶는다 (results가 없는 응답도 빈 객체)', () => {
+    expect(resultsById([wrong, right])['q-b']).toEqual(right)
+    expect(resultsById(undefined)).toEqual({})
   })
 })

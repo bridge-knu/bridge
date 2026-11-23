@@ -9,6 +9,7 @@ import {
   buildConceptGraph,
   initialViewport,
   isWeak,
+  weakNodesInOrder,
 } from './layout.ts'
 
 const concept = (id: string, prereqs: string[], mastery: number): ConceptResult => ({
@@ -120,5 +121,18 @@ describe('initialViewport (그래프 첫 화면)', () => {
 
   it('노드가 없으면 원점', () => {
     expect(initialViewport([], 300, 300)).toEqual({ x: 0, y: 0, zoom: 1, whole: true })
+  })
+})
+
+describe('weakNodesInOrder (보충할 개념 바로가기 순서)', () => {
+  it('보충할 개념만 선수 개념부터 (위→아래, 같은 줄은 왼쪽→오른쪽)', () => {
+    const { nodes } = buildConceptGraph(
+      [concept('a', [], 0.2), concept('b', ['a'], 0.9), concept('c', ['b'], 0.1), concept('d', ['b'], 0.3)],
+      () => null,
+    )
+    const order = weakNodesInOrder(nodes).map((n) => n.id)
+    expect(order[0]).toBe('a')
+    expect(order.slice(1).sort()).toEqual(['c', 'd'])
+    expect(order).not.toContain('b')
   })
 })

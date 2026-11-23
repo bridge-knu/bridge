@@ -299,39 +299,38 @@ select {
   text-decoration: underline;
 }
 
-/* 휴대폰: 로고 한 줄 + 메뉴 6개를 3칸 2줄로 */
+/* 휴대폰: 첫 줄은 로고 + 로그아웃(로그인), 둘째 줄은 메뉴 5개를 같은 폭 밑줄 탭으로 */
 @media (max-width: 720px) {
   .layout-nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding-bottom: var(--space-2);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .layout-nav .brand {
-    grid-column: 1 / -1;
+    grid-row: 1;
+    grid-column: 1 / 4;
     margin-right: 0;
-    padding-bottom: var(--space-2);
+    padding: var(--space-2) 0;
   }
 
-  .layout-nav a:not(.brand),
-  .layout-nav .layout-logout {
+  .layout-nav .layout-logout,
+  .layout-nav a.layout-login {
+    grid-row: 1;
+    grid-column: 4 / 6;
+    justify-self: end;
+    margin: 0;
+    padding: var(--space-2) 0;
+    border-bottom: none;
+    font-size: var(--text-sm);
+  }
+
+  .layout-nav a:not(.brand):not(.layout-login) {
+    grid-row: 2;
     justify-content: center;
     min-height: 2.75rem;
-    margin: 0;
-    padding: var(--space-2) var(--space-1);
-    border-bottom: none;
-    border-radius: var(--radius-sm);
+    padding: var(--space-2) 0;
     font-size: var(--text-sm);
     white-space: nowrap;
-  }
-
-  .layout-nav a.active:not(.brand) {
-    background-color: var(--color-ink);
-    color: var(--color-surface);
-  }
-
-  .layout-nav .layout-logout {
-    margin-left: 0;
   }
 }
 
@@ -1042,6 +1041,56 @@ select {
 
 /* ---- 개념 그래프 ---- */
 
+/* 결과 화면 위쪽: 보충할 개념 바로가기. 그래프 앞이 빽빽하지 않게 한 줄로, 넘치면 옆으로 밀어서 본다 */
+.weak-shortcuts {
+  margin: 0 0 var(--space-4);
+}
+
+.weak-shortcuts-title {
+  margin: 0 0 var(--space-2);
+  color: var(--color-gap-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.weak-shortcuts ul {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.weak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--color-gap);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-gap-bg);
+  color: var(--color-gap-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.weak-chip:hover {
+  border-style: solid;
+}
+
+@media (max-width: 600px) {
+  .weak-shortcuts ul {
+    margin: 0 calc(-1 * var(--page-gutter));
+    padding: 0 var(--page-gutter) var(--space-1);
+  }
+}
+
 .concept-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1369,6 +1418,64 @@ select {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* 채점 뒤: 정답 보기는 파랑 ✓, 내가 고른 오답은 주황 ! 점선 (진단 화면·결과 그래프와 같은 색 약속) */
+.check-choices label.answer {
+  border-color: var(--color-known);
+  box-shadow: inset 0 0 0 1px var(--color-known);
+  background-color: var(--color-known-bg);
+  color: var(--color-known-ink);
+  font-weight: 700;
+}
+
+.check-choices label.wrong {
+  border-color: var(--color-gap);
+  border-style: dashed;
+  box-shadow: none;
+  background-color: var(--color-gap-bg);
+  color: var(--color-gap-ink);
+}
+
+/* 진단 화면 보기는 .form label이 flex라 맞춰져 있지만, 블록 화면은 .form 밖이라 따로 flex를 준다 */
+.check-choices label {
+  display: flex;
+}
+
+.check-choice-text {
+  flex: 1;
+}
+
+.check-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.check-choices label.wrong .check-mark {
+  border-style: dashed;
+}
+
+.check-feedback {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.check-feedback.known {
+  color: var(--color-known-ink);
+}
+
+.check-feedback.gap {
+  color: var(--color-gap-ink);
 }
 
 .block-complete .block-toolbar {

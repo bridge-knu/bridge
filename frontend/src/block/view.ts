@@ -1,6 +1,6 @@
 // 블록 학습 화면의 작은 도우미: 에디터 초기 코드, 조회 오류 분류, 확인 문제 답 정리.
 
-import { ApiError, type BlockDetail, type CheckAnswer, type PracticeLang } from '../api.ts'
+import { ApiError, type BlockDetail, type CheckAnswer, type CheckResult, type PracticeLang } from '../api.ts'
 
 /** 에디터 초기 코드: 서버에 저장된 코드가 있으면 그것, 없으면 starter */
 export function initialCode(block: Pick<BlockDetail, 'savedCode' | 'practice'>): string {
@@ -38,4 +38,26 @@ export function toCheckAnswers(questionIds: string[], selected: Record<string, n
     const choice = selected[questionId]
     return choice === undefined ? [] : [{ questionId, choice }]
   })
+}
+
+/** 채점 뒤 보기 표시: 정답 보기는 'answer'(파랑 ✓), 내가 고른 오답은 'wrong'(주황 !) */
+export type ChoiceMark = 'answer' | 'wrong' | null
+
+export function choiceMark(result: CheckResult | undefined, index: number): ChoiceMark {
+  if (!result) return null
+  if (index === result.answer) return 'answer'
+  if (index === result.choice) return 'wrong'
+  return null
+}
+
+/** 채점 뒤 문제 아래 한 줄 */
+export function checkFeedback(result: CheckResult): string {
+  if (result.correct) return '정답이에요.'
+  const answer = `정답은 ${result.answer + 1}번이에요.`
+  return result.choice === null ? `답하지 않았어요. ${answer}` : `틀렸어요. ${answer}`
+}
+
+/** 완료 응답의 채점 결과를 문제 id로 찾을 수 있게 */
+export function resultsById(results: CheckResult[] | undefined): Record<string, CheckResult> {
+  return Object.fromEntries((results ?? []).map((r) => [r.questionId, r]))
 }

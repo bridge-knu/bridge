@@ -14,7 +14,7 @@ import '@xyflow/react/dist/style.css'
 import { getDiagnosisResult, setAuthToken, type ConceptResult } from '../api.ts'
 import { findBlockId } from '../graph/blocks.ts'
 import { classifyResultError, resultErrorMessage } from '../graph/errors.ts'
-import { buildConceptGraph, initialViewport, type ConceptNode } from '../graph/layout.ts'
+import { buildConceptGraph, initialViewport, weakNodesInOrder, type ConceptNode } from '../graph/layout.ts'
 
 type State =
   | { status: 'loading' }
@@ -173,7 +173,8 @@ export default function ResultPage() {
     )
   }
 
-  const weakCount = graph.nodes.filter((n) => n.data.weak).length
+  const weakNodes = weakNodesInOrder(graph.nodes)
+  const weakCount = weakNodes.length
   const diagnosedCount = graph.nodes.filter((n) => n.data.concept.source === 'diagnosed').length
 
   return (
@@ -183,6 +184,29 @@ export default function ResultPage() {
         개념 {graph.nodes.length}개 중 {weakCount}개를 보충하면 돼요. 위에서 아래로 선수 개념 → 목표 개념 순서예요.
         노드를 누르면 학습 블록으로 이동해요.
       </p>
+      {weakCount > 0 && (
+        // 그래프가 길어서 휴대폰 첫 화면엔 보충할 개념이 안 보인다. 위쪽에 바로가기로 먼저 보여 준다
+        <nav className="weak-shortcuts" aria-label="보충할 개념 바로가기">
+          <p className="weak-shortcuts-title">보충할 개념 · 누르면 그 학습 블록으로 가요</p>
+          <ul>
+            {weakNodes.map((n) => (
+              <li key={n.id}>
+                {n.data.blockId ? (
+                  <Link to={`/blocks/${encodeURIComponent(n.data.blockId)}`} className="weak-chip">
+                    <span aria-hidden="true">!</span>
+                    {n.data.label}
+                  </Link>
+                ) : (
+                  <span className="weak-chip" title="아직 연결된 학습 블록이 없어요">
+                    <span aria-hidden="true">!</span>
+                    {n.data.label}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
       <ul className="concept-legend">
         <li>
           <span className="swatch strong" aria-hidden="true">

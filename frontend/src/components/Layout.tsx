@@ -35,7 +35,11 @@ export default function Layout() {
             <img src="/favicon.svg" alt="" className="brand-mark" width={28} height={28} />
             브릿지
           </Link>
-          {!loggedIn && <NavLink to="/login">로그인</NavLink>}
+          {!loggedIn && (
+            <NavLink to="/login" className="layout-login">
+              로그인
+            </NavLink>
+          )}
           {NAV_ITEMS.map((item) => (
             <NavLink key={item.to} to={item.to}>
               {item.label}
