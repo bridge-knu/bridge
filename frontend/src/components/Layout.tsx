@@ -26,9 +26,13 @@ export default function Layout() {
 
   return (
     <>
+      <a href="#main" className="skip-link">
+        본문으로 건너뛰기
+      </a>
       <header className="layout-header">
         <nav className="layout-nav">
           <Link to={loggedIn ? '/plan' : '/login'} className="brand">
+            <img src="/favicon.svg" alt="" className="brand-mark" width={28} height={28} />
             브릿지
           </Link>
           {!loggedIn && <NavLink to="/login">로그인</NavLink>}
@@ -44,7 +48,7 @@ export default function Layout() {
           )}
         </nav>
       </header>
-      <main className="layout-main">
+      <main id="main" className="layout-main" tabIndex={-1}>
         <Outlet />
       </main>
     </>

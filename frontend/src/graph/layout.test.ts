@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { ConceptResult } from '../api.ts'
-import { MASTERY_THRESHOLD, buildConceptGraph, isWeak } from './layout.ts'
+import {
+  FIT_MIN_ZOOM,
+  MASTERY_THRESHOLD,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  READABLE_ZOOM,
+  buildConceptGraph,
+  initialViewport,
+  isWeak,
+} from './layout.ts'
 
 const concept = (id: string, prereqs: string[], mastery: number): ConceptResult => ({
   id,
@@ -73,5 +82,43 @@ describe('buildConceptGraph', () => {
 
   it('빈 결과는 빈 그래프', () => {
     expect(buildConceptGraph([], noBlock)).toEqual({ nodes: [], edges: [] })
+  })
+})
+
+describe('initialViewport (그래프 첫 화면)', () => {
+  const at = (x: number, y: number) => ({ position: { x, y } })
+
+  it('작은 그래프는 전체를 가운데에 맞춘다', () => {
+    // 그래프 크기 160 x 56, 화면 900 x 900 → 최대 배율 1.2로 가운데
+    const v = initialViewport([at(0, 0)], 900, 900)
+    expect(v.whole).toBe(true)
+    expect(v.zoom).toBe(1.2)
+    expect(v.x).toBeCloseTo((900 - NODE_WIDTH * 1.2) / 2)
+    expect(v.y).toBeCloseTo((900 - NODE_HEIGHT * 1.2) / 2)
+  })
+
+  it('맞추면 글자가 작아지는 큰 그래프는 읽을 수 있는 배율로 맨 위 가운데부터 보여 준다', () => {
+    // 폭 1700, 높이 1800인 그래프를 358 x 640 화면에
+    const nodes = [at(0, 100), at(1700 - NODE_WIDTH, 100 + 1800 - NODE_HEIGHT)]
+    const v = initialViewport(nodes, 358, 640, 24)
+    expect(v.whole).toBe(false)
+    expect(v.zoom).toBe(READABLE_ZOOM)
+    expect(v.y).toBeCloseTo(24 - 100 * READABLE_ZOOM)
+    // 양옆이 같은 만큼 잘려서 맨 위 가운데 노드가 보인다
+    const left = 0 * v.zoom + v.x
+    const right = 1700 * v.zoom + v.x
+    expect(left).toBeCloseTo(358 - right)
+  })
+
+  it('전체를 맞춘 배율이 기준 이상이면 전체 보기', () => {
+    // 높이 기준 배율이 FIT_MIN_ZOOM 바로 위가 되도록
+    const h = 1000 / (1.2 * FIT_MIN_ZOOM) - 1
+    const v = initialViewport([at(0, 0), at(0, h - NODE_HEIGHT)], 2000, 1000)
+    expect(v.whole).toBe(true)
+    expect(v.zoom).toBeGreaterThanOrEqual(FIT_MIN_ZOOM)
+  })
+
+  it('노드가 없으면 원점', () => {
+    expect(initialViewport([], 300, 300)).toEqual({ x: 0, y: 0, zoom: 1, whole: true })
   })
 })

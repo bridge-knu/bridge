@@ -48,6 +48,10 @@ export interface PlanView {
   deferred: DeferredConcept[] | null
   /** 미룬 개념 안내 문구 (백엔드가 줄 때만) */
   message: string | null
+  /** 한 개념이 블록 여러 개로 나뉜 경우 블록별 "몇 번째 / 전체" (blockId → 값). 블록이 하나인 개념은 없음 */
+  parts: Map<string, { index: number; total: number }>
+  /** 플랜의 마지막 학습일 (YYYY-MM-DD). 블록이 없으면 null */
+  lastDate: string | null
 }
 
 /** 브라우저 기준 오늘 날짜 (YYYY-MM-DD, 로컬 시간). API가 today를 주지 않을 때만 대신 쓴다 */
@@ -119,6 +123,18 @@ export function toPlanView(plan: Plan, today: string = plan.today ?? localToday(
 
   const doneBlocks = all.filter((b) => b.done).length
 
+  // 같은 개념의 블록에 날짜·순서대로 번호를 붙인다 ("포인터 1/2", "포인터 2/2")
+  const totals = new Map<string, number>()
+  for (const b of all) totals.set(b.conceptId, (totals.get(b.conceptId) ?? 0) + 1)
+  const seen = new Map<string, number>()
+  const parts = new Map<string, { index: number; total: number }>()
+  for (const b of all) {
+    const total = totals.get(b.conceptId) ?? 1
+    const index = (seen.get(b.conceptId) ?? 0) + 1
+    seen.set(b.conceptId, index)
+    if (total > 1) parts.set(b.blockId, { index, total })
+  }
+
   return {
     todayDate: today,
     returnDate: plan.returnDate,
@@ -131,6 +147,8 @@ export function toPlanView(plan: Plan, today: string = plan.today ?? localToday(
     allDone: all.length > 0 && doneBlocks === all.length,
     deferred: plan.deferredConcepts ?? null,
     message: plan.message ?? null,
+    parts,
+    lastDate: sorted.length > 0 ? sorted[sorted.length - 1].date : null,
   }
 }
 
@@ -154,6 +172,21 @@ export function formatDate(date: string): string {
   const day = new Date(y, m - 1, d)
   const weekday = ['일', '월', '화', '수', '목', '금', '토'][day.getDay()]
   return `${m}월 ${d}일 (${weekday})`
+}
+
+/** 오늘부터 복학일까지 남은 날 수 (D-N의 N). 복학일이 지났으면 음수 */
+export function daysUntil(today: string, target: string): number {
+  const toUtc = (date: string) => {
+    const [y, m, d] = date.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((toUtc(target) - toUtc(today)) / 86_400_000)
+}
+
+/** "D-42", 당일은 "D-Day", 지난 뒤는 "D+3" */
+export function dDayLabel(days: number): string {
+  if (days === 0) return 'D-Day'
+  return days > 0 ? `D-${days}` : `D+${-days}`
 }
 
 /**

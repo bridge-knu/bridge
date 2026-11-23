@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { generatePlan, getPlan, setAuthToken, type Plan } from '../api.ts'
 import {
   classifyPlanError,
+  dDayLabel,
+  daysUntil,
   formatDate,
   planErrorMessage,
   todayGuideText,
@@ -18,12 +20,15 @@ type State =
 
 function DayCard({ day, view }: { day: PlanDayView; view: PlanView }) {
   return (
-    <section className={`plan-day${day.isToday ? ' today' : ''}`} aria-label={formatDate(day.date)}>
+    <section
+      className={`plan-day${day.isToday ? ' today' : ''}${day.isPast && !day.allDone ? ' past' : ''}${day.allDone ? ' done' : ''}`}
+      aria-label={formatDate(day.date)}
+    >
       <header className="plan-day-header">
         <h2>
           {day.isToday && <span className="plan-badge today">오늘</span>}
           {day.isPast && !day.allDone && <span className="plan-badge past">지난 날</span>}
-          {formatDate(day.date)}
+          <span className="plan-day-date">{formatDate(day.date)}</span>
         </h2>
         <span className="plan-day-meta">
           {day.allDone ? '모두 완료' : `${day.blocks.length}개 · ${day.minutes}분`}
@@ -33,11 +38,19 @@ function DayCard({ day, view }: { day: PlanDayView; view: PlanView }) {
         {day.blocks.map((b) => {
           const reachable = view.reachableToday.has(b.blockId)
           const last = view.today.kind === 'remaining' && view.today.lastBlockId === b.blockId
+          const part = view.parts.get(b.blockId)
           const cls = ['plan-block', b.done ? 'done' : '', reachable ? 'reachable' : ''].filter(Boolean).join(' ')
           return (
             <li key={b.blockId}>
               <Link to={`/blocks/${encodeURIComponent(b.blockId)}`} className={cls}>
-                <span className="plan-block-name">{b.conceptName}</span>
+                <span className="plan-block-name">
+                  {b.conceptName}
+                  {part && (
+                    <span className="plan-block-part">
+                      {part.index}/{part.total}
+                    </span>
+                  )}
+                </span>
                 <span className="plan-block-meta">
                   {b.minutes}분
                   {b.done && <span className="plan-badge done">완료</span>}
@@ -113,6 +126,8 @@ export default function PlanPage() {
     () => (state.status === 'ready' ? toPlanView(state.plan) : null),
     [state],
   )
+  // 마지막 학습일부터 복학일까지 남는 날. 이틀 이상이면 다리 끝을 점선으로 그리고 알려 준다
+  const gapDays = view?.lastDate ? daysUntil(view.lastDate, view.returnDate) : 0
 
   if (state.status === 'loading') {
     return (
@@ -169,8 +184,13 @@ export default function PlanPage() {
 
   return (
     <section className="plan">
+      <p className="plan-countdown">
+        <span className="plan-countdown-label">복학까지</span>
+        <span className="plan-dday">{dDayLabel(daysUntil(view.todayDate, view.returnDate))}</span>
+      </p>
+
       <div className="plan-head">
-        <div>
+        <div className="plan-title">
           <h1>학습 플랜</h1>
           <p className="form-hint">
             오늘 {formatDate(view.todayDate)} · 복학일 {formatDate(view.returnDate)}까지 · 하루 {view.dailyMinutes}분 · 블록 {view.doneBlocks}/
@@ -194,10 +214,19 @@ export default function PlanPage() {
         {view.days.map((day) => (
           <DayCard key={day.date} day={day} view={view} />
         ))}
+        {view.lastDate && gapDays > 1 && (
+          <p className="plan-gap">
+            {formatDate(view.lastDate)}에 플랜이 끝나요. 복학까지 {gapDays}일이 더 남아요.
+          </p>
+        )}
+        <p className="plan-end">
+          <span className="plan-end-label">복학일</span>
+          {formatDate(view.returnDate)}
+        </p>
       </div>
 
       {view.deferred !== null && (
-        <section className="plan-deferred" aria-label="미룬 개념">
+        <section className={`plan-deferred${view.deferred.length === 0 ? ' empty' : ''}`} aria-label="미룬 개념">
           <h2>복학 후로 미룬 개념</h2>
           {view.deferred.length === 0 ? (
             <p className="form-hint">시간 안에 모든 개념을 배울 수 있어요. 미룬 개념이 없어요.</p>

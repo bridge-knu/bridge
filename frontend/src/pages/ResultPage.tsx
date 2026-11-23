@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Background,
   Controls,
@@ -7,13 +7,14 @@ import {
   Position,
   ReactFlow,
   type NodeMouseHandler,
+  type OnInit,
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { getDiagnosisResult, setAuthToken, type ConceptResult } from '../api.ts'
 import { findBlockId } from '../graph/blocks.ts'
 import { classifyResultError, resultErrorMessage } from '../graph/errors.ts'
-import { buildConceptGraph, type ConceptNode } from '../graph/layout.ts'
+import { buildConceptGraph, initialViewport, type ConceptNode } from '../graph/layout.ts'
 
 type State =
   | { status: 'loading' }
@@ -23,17 +24,38 @@ type State =
 
 function ConceptNodeView({ data }: NodeProps<ConceptNode>) {
   const percent = Math.round(data.concept.mastery * 100)
-  return (
-    <div
-      className="concept-node-body"
-      title={data.blockId ? '눌러서 학습 블록으로 이동' : '아직 연결된 학습 블록이 없어요'}
-    >
+  const content = (
+    <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
-      <strong>{data.label}</strong>
+      <strong>
+        <span className="concept-icon" aria-hidden="true">
+          {data.weak ? '!' : '✓'}
+        </span>
+        {data.label}
+      </strong>
       <span>
+        <span className="visually-hidden">{data.weak ? '보충할 개념, ' : '아는 개념, '}</span>
         {percent}%{data.blockId ? '' : ' · 블록 준비 중'}
       </span>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
+    </>
+  )
+
+  // 블록이 있는 개념은 진짜 링크로 만들어 마우스·키보드(Tab, Enter) 모두 블록으로 이동하게 한다
+  if (data.blockId) {
+    return (
+      <Link
+        to={`/blocks/${encodeURIComponent(data.blockId)}`}
+        className="concept-node-body concept-link"
+        title="눌러서 학습 블록으로 이동"
+      >
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <div className="concept-node-body" title="아직 연결된 학습 블록이 없어요">
+      {content}
     </div>
   )
 }
@@ -45,6 +67,9 @@ export default function ResultPage() {
   const navigate = useNavigate()
   const [state, setState] = useState<State>({ status: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
+  // 그래프가 한 화면에 다 들어왔는지. 아니면 끌어서 보라는 안내를 띄운다
+  const [graphWhole, setGraphWhole] = useState(true)
+  const graphBoxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -78,12 +103,27 @@ export default function ResultPage() {
     return buildConceptGraph(state.concepts, findBlockId)
   }, [state])
 
+  // React Flow는 클릭 처리기가 없으면 노드의 마우스 이벤트를 꺼 버린다 (pointer-events: none).
+  // 노드 안 링크가 이미 이동했으면(defaultPrevented) 건너뛰고, 링크 바깥 테두리를 눌렀을 때만 여기서 이동한다.
   const handleNodeClick = useCallback<NodeMouseHandler<ConceptNode>>(
-    (_, node) => {
+    (event, node) => {
+      if (event.defaultPrevented) return
       const { blockId } = node.data
       if (blockId) navigate(`/blocks/${encodeURIComponent(blockId)}`)
     },
     [navigate],
+  )
+
+  const handleInit = useCallback<OnInit<ConceptNode>>(
+    (flow) => {
+      const box = graphBoxRef.current
+      if (!graph || !box) return
+      // 개념이 많으면 전체를 맞출 때 글자가 너무 작아지므로, 읽을 수 있는 배율로 맨 위부터 보여 준다
+      const { whole, ...viewport } = initialViewport(graph.nodes, box.clientWidth, box.clientHeight)
+      void flow.setViewport(viewport)
+      setGraphWhole(whole)
+    },
+    [graph],
   )
 
   if (state.status === 'loading') {
@@ -143,13 +183,23 @@ export default function ResultPage() {
       </p>
       <ul className="concept-legend">
         <li>
-          <span className="swatch strong" /> 아는 개념 (60% 이상)
+          <span className="swatch strong" aria-hidden="true">
+            ✓
+          </span> 아는 개념 (60% 이상)
         </li>
         <li>
-          <span className="swatch weak" /> 보충할 개념 (60% 미만)
+          <span className="swatch weak" aria-hidden="true">
+            !
+          </span> 보충할 개념 (60% 미만)
         </li>
       </ul>
-      <div className="concept-graph">
+      {!graphWhole && (
+        <p className="concept-graph-hint">
+          그래프를 끌어서(휴대폰은 손가락으로 밀어서) 나머지 개념을 볼 수 있어요. 오른쪽 위 버튼으로 확대·축소하거나 전체를
+          한눈에 볼 수 있어요.
+        </p>
+      )}
+      <div className="concept-graph" ref={graphBoxRef}>
         <ReactFlow
           nodes={graph.nodes}
           edges={graph.edges}
@@ -158,14 +208,21 @@ export default function ResultPage() {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
-          // 개념 20개 안팎이면 그래프가 화면보다 훨씬 길다. 기본 최소 배율(0.5)에서는 다 못 넣어서
-          // 맨 위(기초 개념)가 잘리므로 더 작게 줄일 수 있게 하고, 처음 열 때 전체가 보이게 맞춘다
+          // 노드 안의 링크가 포커스를 받으므로 노드·간선 자체는 Tab 순서에서 뺀다
+          nodesFocusable={false}
+          edgesFocusable={false}
+          // 개념 20개 안팎이면 그래프가 화면보다 훨씬 길다. 전체 보기 버튼으로 다 넣을 수 있게 더 작게 줄일 수 있게 한다.
+          // 처음 화면 위치는 onInit에서 initialViewport로 정한다
           minZoom={0.1}
-          fitView
+          // 그래프 위에서 휠을 굴리면 확대 대신 페이지가 스크롤되게 한다 (확대는 +/- 버튼·핀치)
+          zoomOnScroll={false}
+          preventScrolling={false}
           fitViewOptions={{ padding: 0.1 }}
+          onInit={handleInit}
         >
           <Background />
-          <Controls showInteractive={false} />
+          {/* 맨 위 가운데(기초 개념)와 겹치지 않게 오른쪽 위에 둔다 */}
+          <Controls showInteractive={false} position="top-right" />
         </ReactFlow>
       </div>
     </section>
