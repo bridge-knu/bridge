@@ -1082,12 +1082,41 @@ a.weak-chip:hover {
   border-style: solid;
 }
 
+.weak-shortcuts-more {
+  display: none;
+}
+
 /* 휴대폰: 한 줄로 두고 옆으로 밀어서 본다. 스크롤 영역이 바깥 포커스 테두리를 자르므로 위아래 여백을 두고 테두리는 안쪽에 */
 @media (max-width: 600px) {
+  /* 오른쪽 끝을 바탕색으로 흐리게 해서 칩이 더 있다는 걸 보여 준다 */
+  .weak-shortcuts {
+    position: relative;
+  }
+
+  .weak-shortcuts::after {
+    content: '';
+    position: absolute;
+    right: calc(-1 * var(--page-gutter));
+    bottom: 0;
+    width: 2.5rem;
+    height: calc(2.25rem + 2 * var(--space-1));
+    background: linear-gradient(to right, transparent, var(--color-paper));
+    pointer-events: none;
+  }
+
+  .weak-shortcuts-more {
+    display: inline;
+  }
+
+  .weak-shortcuts-desc {
+    display: none;
+  }
+
   .weak-shortcuts ul {
     flex-wrap: nowrap;
     margin: 0 calc(-1 * var(--page-gutter));
-    padding: var(--space-1) var(--page-gutter);
+    /* 마지막 칩이 흐린 부분을 지나 끝까지 보이게 오른쪽 여백을 더 둔다 */
+    padding: var(--space-1) 2.5rem var(--space-1) var(--page-gutter);
     overflow-x: auto;
     scrollbar-width: thin;
   }
@@ -1669,12 +1698,58 @@ a.weak-chip:hover {
   border-style: dashed;
 }
 
-/* 범례 줄 끝의 진단 확인·추정 개수 */
+/* 범례 줄 끝의 진단 확인·추정 개수. 눌러서 설명을 펼친다 (휴대폰에서도 보이게) */
 .concept-legend .concept-legend-source {
   color: var(--color-ink-soft);
   font-size: var(--text-sm);
   font-weight: 600;
-  cursor: help;
+}
+
+.concept-legend-source details {
+  max-width: 100%;
+}
+
+/* 펼치면 설명이 한 줄을 다 쓰게 */
+.concept-legend .concept-legend-source:has(details[open]) {
+  flex-basis: 100%;
+}
+
+.concept-legend-source summary::-webkit-details-marker {
+  display: none;
+}
+
+.concept-legend-source summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.25rem;
+  list-style: none;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.concept-legend-source summary::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.concept-legend-source details p {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 400;
+  line-height: var(--leading-body);
 }
 
 /* 공용 데모 계정에서 다시 진단을 막았을 때 안내 (오류가 아니라 안내라서 중립 카드) */
