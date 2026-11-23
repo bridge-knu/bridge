@@ -164,6 +164,8 @@ export default function ProfilePage() {
           공백 기간 (개월)
           <input
             type="number"
+            name="gapMonths"
+            autoComplete="off"
             inputMode="numeric"
             min={0}
             max={GAP_MONTHS_MAX}
@@ -205,6 +207,8 @@ export default function ProfilePage() {
           하루 학습 가능 시간 (분)
           <input
             type="number"
+            name="dailyMinutes"
+            autoComplete="off"
             inputMode="numeric"
             min={DAILY_MINUTES_MIN}
             max={DAILY_MINUTES_MAX}

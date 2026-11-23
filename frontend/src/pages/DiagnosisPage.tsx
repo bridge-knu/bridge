@@ -6,6 +6,8 @@ import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
 type Phase = 'intro' | 'question' | 'done'
 
+const NEED_CHOICE = '보기를 하나 골라 주세요'
+
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? '잠시 후 다시 시도해 주세요'
   if (err instanceof TypeError) return '서버에 연결할 수 없어요. 네트워크를 확인해 주세요'
@@ -63,7 +65,11 @@ export default function DiagnosisPage() {
 
   function handleSubmit() {
     const question = step?.question
-    if (loading || !question || selected === null) return
+    if (loading || !question) return
+    if (selected === null) {
+      setError(NEED_CHOICE)
+      return
+    }
     void run(() => diagnosisSource.answer(question.id, selected))
   }
 
@@ -130,7 +136,10 @@ export default function DiagnosisPage() {
                 type="radio"
                 name={question.id}
                 checked={selected === i}
-                onChange={() => setSelected(i)}
+                onChange={() => {
+                  setSelected(i)
+                  if (error === NEED_CHOICE) setError(null)
+                }}
               />
               {choice}
             </label>
@@ -149,7 +158,7 @@ export default function DiagnosisPage() {
           </button>
         )}
 
-        <button type="button" onClick={handleSubmit} disabled={loading || selected === null}>
+        <button type="button" onClick={handleSubmit} disabled={loading}>
           {loading ? '제출 중…' : number < total ? '다음 문제' : '제출하고 끝내기'}
         </button>
       </div>
