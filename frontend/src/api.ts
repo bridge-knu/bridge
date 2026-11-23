@@ -199,6 +199,14 @@ export function saveProfile(profile: Profile) {
   return request<ProfileResponse>('PUT', '/profile', profile)
 }
 
+/**
+ * GET /profile: 저장된 프로필. 프로필 화면이 양식을 채울 때 쓴다.
+ * 실패: 404 아직 입력하지 않음(PROFILE_NOT_FOUND), 401 로그인 만료 → ApiError
+ */
+export function getProfile() {
+  return request<ProfileResponse>('GET', '/profile')
+}
+
 // ---- 진단 ----
 
 /** 화면에 보여줄 문제. 정답은 내려오지 않는다. */

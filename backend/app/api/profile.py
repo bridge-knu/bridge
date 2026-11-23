@@ -23,6 +23,20 @@ def load_profile(db: Session, user_id: int) -> Profile | None:
     return Profile.model_validate({f: getattr(row, f) for f in FIELDS})
 
 
+@router.get(
+    "/profile",
+    response_model=ProfileResponse,
+    responses=responses("PROFILE_NOT_FOUND"),
+    summary="저장된 프로필",
+    description="프로필 화면이 저장된 값을 채워 보여 줄 때 쓴다. 아직 입력하지 않았으면 404 PROFILE_NOT_FOUND.",
+)
+def get_profile(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.get(models.Profile, user.id)
+    if row is None:
+        raise ApiError("PROFILE_NOT_FOUND")
+    return ProfileResponse(**{f: getattr(row, f) for f in FIELDS}, updated_at=row.updated_at)
+
+
 @router.put(
     "/profile",
     response_model=ProfileResponse,

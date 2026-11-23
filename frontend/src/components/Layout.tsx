@@ -40,11 +40,13 @@ export default function Layout() {
               로그인
             </NavLink>
           )}
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to}>
-              {item.label}
-            </NavLink>
-          ))}
+          {/* 로그인 전에는 눌러도 로그인 화면으로 돌아가므로 메뉴를 숨긴다 */}
+          {loggedIn &&
+            NAV_ITEMS.map((item) => (
+              <NavLink key={item.to} to={item.to}>
+                {item.label}
+              </NavLink>
+            ))}
           {loggedIn && (
             <button type="button" className="layout-logout" onClick={handleLogout}>
               로그아웃
