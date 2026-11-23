@@ -23,7 +23,7 @@
 ## 코드 원칙
 - engine/은 DB를 모르는 순수 함수로 작성하고, 모든 함수에 pytest 테스트를 둔다.
 - 콘텐츠는 content/*.json에 두고 DB에 넣지 않는다.
-- API는 정해진 목록(README 참고)을 따른다. 새 API는 만들기 전에 공유한다.
+- API는 정해진 목록([DEVELOPMENT.md](DEVELOPMENT.md) 참고)을 따른다. 새 API는 만들기 전에 공유한다.
 - 비밀번호·키는 .env에만 둔다. .env는 커밋하지 않는다.
 - 코드와 주석에 생성 도구 관련 표시를 남기지 않는다.
 

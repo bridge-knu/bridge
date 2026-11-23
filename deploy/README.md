@@ -42,7 +42,10 @@ docker compose up -d --build
 ```bash
 cd bridge && git pull
 cd deploy && docker compose up -d --build
+docker compose restart backend
 ```
+
+- `content/`는 컨테이너에 연결만 되어 있고 backend가 시작할 때 한 번 읽어 두기 때문에, 콘텐츠만 바뀐 업데이트는 `up -d --build`로는 반영되지 않는다. 그래서 마지막에 backend를 재시작한다.
 
 DB 마이그레이션은 backend가 시작할 때 자동으로 적용된다. 업데이트 후에는 데모 계정(`demo` / `0000`)으로 데모 시나리오를 한 번 끝까지 돌려 본다.
 
