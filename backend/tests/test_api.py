@@ -484,6 +484,10 @@ def test_complete_block(client):
         "done": True,
         "correctCount": len(check),
         "totalCount": len(check),
+        "results": [
+            {"questionId": q, "choice": GRAPH.questions[q].answer, "answer": GRAPH.questions[q].answer, "correct": True}
+            for q in check
+        ],
         "nextBlockId": ids[ids.index("b-array-1") + 1],
     }
     assert client.get("/blocks/b-array-1").json()["done"] is True
@@ -501,6 +505,19 @@ def test_complete_without_body(client):
     r = client.post("/blocks/b-array-1/complete")
     assert r.status_code == 200
     assert r.json()["correctCount"] == 0
+    assert all(r["choice"] is None and r["correct"] is False for r in r.json()["results"])
+
+
+def test_complete_tells_which_answers_were_wrong(client):
+    check = GRAPH.blocks["b-array-1"].check
+    first = GRAPH.questions[check[0]]
+    wrong = (first.answer + 1) % len(first.choices)
+    body = client.post(
+        "/blocks/b-array-1/complete", json={"checkAnswers": [{"questionId": first.id, "choice": wrong}]}
+    ).json()
+    assert body["correctCount"] == 0
+    assert body["results"][0] == {"questionId": first.id, "choice": wrong, "answer": first.answer, "correct": False}
+    assert [r["questionId"] for r in body["results"]] == list(check)
 
 
 def test_all_12_endpoints_in_docs(client):

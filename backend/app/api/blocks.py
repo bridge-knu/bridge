@@ -9,6 +9,7 @@ from app.api.diagnosis import question_out
 from app.api.errors import ApiError, responses
 from app.api.schemas import (
     BlockDetail,
+    CheckResult,
     CompleteRequest,
     CompleteResponse,
     Practice,
@@ -65,7 +66,7 @@ def get_block(block_id: str, user: User = Depends(get_current_user), db: Session
     responses=NOT_FOUND,
     summary="블록 완료 처리",
     description=(
-        "확인 문제 답을 함께 보내면 채점한다. 틀려도 완료로 처리한다. "
+        "확인 문제 답을 함께 보내면 채점하고, results에 문제별로 보낸 답·정답·맞았는지를 준다. 틀려도 완료로 처리한다. "
         "nextBlockId는 플랜에서 이 블록 다음의 아직 안 끝낸 블록 (없으면 null)."
     ),
 )
@@ -78,7 +79,15 @@ def complete(
     graph = get_graph()
     b = get_block_or_404(block_id)
     answers = {a.question_id: a.choice for a in (body.check_answers if body else [])}
-    correct = sum(1 for q in b.check if answers.get(q) == graph.questions[q].answer)
+    results = [
+        CheckResult(
+            question_id=q,
+            choice=answers.get(q),
+            answer=graph.questions[q].answer,
+            correct=answers.get(q) == graph.questions[q].answer,
+        )
+        for q in b.check
+    ]
 
     # 처음 끝낸 시각만 남긴다 (오늘 남은 시간 계산용)
     db.execute(
@@ -95,7 +104,8 @@ def complete(
     return CompleteResponse(
         block_id=block_id,
         done=True,
-        correct_count=correct,
+        correct_count=sum(r.correct for r in results),
         total_count=len(b.check),
+        results=results,
         next_block_id=rest[0] if rest else None,
     )
