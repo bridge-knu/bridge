@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ApiError, login, setAuthToken, startTrial } from '../api.ts'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { ApiError, getAuthToken, login, setAuthToken, startTrial } from '../api.ts'
 
 const PIN_PATTERN = /^\d{4}$/
 
@@ -75,6 +75,9 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  // 이미 로그인한 상태로 로그인 화면에 오면 폼 대신 플랜으로 보낸다
+  if (getAuthToken()) return <Navigate to="/plan" replace />
 
   return (
     <section className="login">
