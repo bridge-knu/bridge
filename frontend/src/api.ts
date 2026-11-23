@@ -368,11 +368,23 @@ export interface CompleteRequest {
   checkAnswers: CheckAnswer[]
 }
 
+/** 확인 문제 하나의 채점 결과 (#55) */
+export interface CheckResult {
+  questionId: string
+  /** 보낸 답. 답하지 않았으면 null */
+  choice: number | null
+  /** 정답 보기 번호 (0부터) */
+  answer: number
+  correct: boolean
+}
+
 export interface CompleteResponse {
   blockId: string
   done: boolean
   correctCount: number
   totalCount: number
+  /** 확인 문제 순서대로 문제별 채점 결과 */
+  results: CheckResult[]
   nextBlockId: string | null
 }
 

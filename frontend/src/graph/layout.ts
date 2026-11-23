@@ -126,3 +126,10 @@ export function initialViewport(
     whole: false,
   }
 }
+
+/** 보충할 개념만 그래프 위(선수 개념)→아래(목표 개념) 순서로. 결과 화면 위쪽 바로가기 목록에 쓴다 */
+export function weakNodesInOrder(nodes: ConceptNode[]): ConceptNode[] {
+  return nodes
+    .filter((n) => n.data.weak)
+    .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
+}

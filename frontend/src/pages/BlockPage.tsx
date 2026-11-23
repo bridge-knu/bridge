@@ -8,12 +8,23 @@ import {
   saveCode,
   setAuthToken,
   type BlockDetail,
+  type CheckResult,
   type CompleteResponse,
 } from '../api.ts'
 import { AutoSaver, saveStatusText, type SaveState } from '../block/autosave.ts'
 import { runOutcome, runOutcomeText, startRun, type RunHandle, type RunPhase } from '../block/runner.ts'
 import { embedUrl, formatSeconds } from '../block/video.ts'
-import { classifyBlockError, editorLanguage, errorText, initialCode, toCheckAnswers } from '../block/view.ts'
+import {
+  checkFeedback,
+  choiceMark,
+  gradingStale,
+  classifyBlockError,
+  editorLanguage,
+  errorText,
+  initialCode,
+  resultsById,
+  toCheckAnswers,
+} from '../block/view.ts'
 
 // Monaco는 크기가 커서 블록 화면에 들어올 때만 불러온다.
 const CodeEditor = lazy(() => import('../block/CodeEditor.tsx'))
@@ -243,6 +254,8 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
   const [completing, setCompleting] = useState(false)
   const [completeResult, setCompleteResult] = useState<CompleteResponse | null>(null)
   const [completeError, setCompleteError] = useState<string | null>(null)
+  // 문제별 채점 결과 (정답 보기·내 오답 표시). 답을 바꾸면 그 문제의 표시는 지운다
+  const [graded, setGraded] = useState<Record<string, CheckResult>>({})
   const completingRef = useRef(false)
   const done = completeResult?.done ?? block.done
   const questions = block.checkQuestions
@@ -263,6 +276,7 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
         ),
       })
       setCompleteResult(res)
+      setGraded(resultsById(res.results))
     } catch (err) {
       if (classifyBlockError(err) === 'unauthorized') return onUnauthorized()
       setCompleteError(errorText(err, '완료 처리에 실패했어요. 다시 시도해 주세요'))
@@ -346,18 +360,40 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
                     </pre>
                   )}
                   <div className="check-choices">
-                    {q.choices.map((choice, i) => (
-                      <label key={`${q.id}-${i}`} className={selected[q.id] === i ? 'selected' : undefined}>
-                        <input
-                          type="radio"
-                          name={q.id}
-                          checked={selected[q.id] === i}
-                          onChange={() => setSelected((s) => ({ ...s, [q.id]: i }))}
-                        />
-                        {choice}
-                      </label>
-                    ))}
+                    {q.choices.map((choice, i) => {
+                      const mark = choiceMark(graded[q.id], i)
+                      const className = [selected[q.id] === i ? 'selected' : null, mark].filter(Boolean).join(' ')
+                      return (
+                        <label key={`${q.id}-${i}`} className={className || undefined}>
+                          <input
+                            type="radio"
+                            name={q.id}
+                            checked={selected[q.id] === i}
+                            onChange={() => {
+                              setSelected((s) => ({ ...s, [q.id]: i }))
+                              setGraded((g) => {
+                                const next = { ...g }
+                                delete next[q.id]
+                                return next
+                              })
+                            }}
+                          />
+                          <span className="check-choice-text">{choice}</span>
+                          {mark && (
+                            <span className="check-mark">
+                              <span aria-hidden="true">{mark === 'answer' ? '✓' : '!'}</span>
+                              <span className="visually-hidden">{mark === 'answer' ? '정답' : '내가 고른 오답'}</span>
+                            </span>
+                          )}
+                        </label>
+                      )
+                    })}
                   </div>
+                  {graded[q.id] && (
+                    <p className={`check-feedback ${graded[q.id].correct ? 'known' : 'gap'}`}>
+                      {checkFeedback(graded[q.id], q.choices)}
+                    </p>
+                  )}
                 </fieldset>
               </li>
             ))}
@@ -370,7 +406,9 @@ function BlockView({ block, onUnauthorized }: { block: BlockDetail; onUnauthoriz
           <p className="run-status success" role="status">
             블록을 완료했어요
             {completeResult.totalCount > 0 &&
-              ` · 확인 문제 ${completeResult.totalCount}개 중 ${completeResult.correctCount}개 정답`}
+              (gradingStale(completeResult.results, graded)
+                ? ' · 답을 바꿨어요. 다시 제출하면 새로 채점해요'
+                : ` · 확인 문제 ${completeResult.totalCount}개 중 ${completeResult.correctCount}개 정답`)}
           </p>
         )}
         {completeError && (
