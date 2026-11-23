@@ -146,6 +146,15 @@ export function login(loginId: string, pin: string) {
   return request<LoginResponse>('POST', '/auth/login', body)
 }
 
+/**
+ * POST /auth/demo: 데모 데이터(프로필 + 진단 결과)를 채운 체험 계정을 새로 만들고 토큰을 받는다.
+ * 누를 때마다 다른 계정이라 여러 명이 같이 써도 서로 결과가 바뀌지 않는다. isNewUser는 항상 false.
+ * 실패: 429 같은 IP에서 너무 많이 만듦 → ApiError
+ */
+export function startTrial() {
+  return request<LoginResponse>('POST', '/auth/demo')
+}
+
 // 성적표의 원래 성적. 정규화(A/B/C, 미이수)는 백엔드가 한다.
 export const GRADES = [
   'A+', 'A0', 'A-',

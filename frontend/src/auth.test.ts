@@ -74,3 +74,26 @@ describe('로그인 토큰 저장 (새로고침해도 유지)', () => {
     expect(listener).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('체험 계정 (POST /auth/demo)', () => {
+  it('본문 없이 POST /api/auth/demo를 부르고 토큰을 돌려준다', async () => {
+    vi.stubGlobal('sessionStorage', fakeStorage())
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ token: 'trial', isNewUser: false }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchFn)
+    const api = await loadApi()
+    const res = await api.startTrial()
+    expect(res).toEqual({ token: 'trial', isNewUser: false })
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/auth/demo')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
+  })
+
+  it('너무 많이 만들면 서버 안내 문구가 담긴 ApiError', async () => {
+    vi.stubGlobal('sessionStorage', fakeStorage())
+    const body = { detail: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요', code: 'TOO_MANY_REQUESTS' }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 429 })))
+    const api = await loadApi()
+    await expect(api.startTrial()).rejects.toMatchObject({ status: 429, detail: body.detail })
+  })
+})
