@@ -186,11 +186,21 @@ class CompleteRequest(CamelModel):
     check_answers: list[CheckAnswer] = Field(default_factory=list)
 
 
+class CheckResult(CamelModel):
+    """확인 문제 하나의 채점 결과. 화면에서 맞은 문제·틀린 문제와 정답을 보여 줄 때 쓴다."""
+
+    question_id: str
+    choice: int | None = Field(description="보낸 답 (안 보냈으면 null)")
+    answer: int = Field(description="정답 보기 번호 (0부터)")
+    correct: bool
+
+
 class CompleteResponse(CamelModel):
     block_id: str
     done: bool
     correct_count: int
     total_count: int
+    results: list[CheckResult] = Field(description="확인 문제 순서대로 문제별 채점 결과")
     next_block_id: str | None
 
 
