@@ -75,7 +75,8 @@ export default function LoginPage() {
         <h1>로그인</h1>
         <p className="login-hint">처음 쓰는 아이디면 자동으로 가입돼요.</p>
         <p className="login-demo">
-          둘러보기만 하려면 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>으로 들어오세요.
+          둘러보기만 하려면 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>으로 들어오세요. 진단부터
+          해 보려면 새 아이디로 들어오면 돼요.
         </p>
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>

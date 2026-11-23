@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, setAuthToken } from '../api.ts'
+import { ApiError, getDiagnosisResult, setAuthToken } from '../api.ts'
 import { classifyDiagnosisError } from '../diagnosis/errors.ts'
 import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
 type Phase = 'intro' | 'question' | 'done'
 
 const NEED_CHOICE = '보기를 하나 골라 주세요'
+const RESTART_CONFIRM = '다시 진단하면 지금 진단 결과가 지워지고 처음부터 다시 풀어요. 계속할까요?'
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? '잠시 후 다시 시도해 주세요'
@@ -25,6 +26,24 @@ export default function DiagnosisPage() {
   const [needsRestart, setNeedsRestart] = useState(false)
   // 같은 틱에 두 번 눌러도 요청이 한 번만 나가게 한다 (loading state는 다음 렌더에야 반영됨).
   const inFlight = useRef(false)
+  // 이미 끝낸 진단이 있는지 (null: 확인 중). 있으면 "진단 시작" 대신 결과 보기를 먼저 보여 준다.
+  // 다시 시작하면 서버가 결과를 지우므로, 같이 쓰는 데모 계정에서 실수로 지우지 않게 한다.
+  const [finished, setFinished] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getDiagnosisResult()
+      .then((res) => {
+        if (!cancelled) setFinished(res.concepts.length > 0)
+      })
+      .catch(() => {
+        // 미완료(400)·오류 모두 평소처럼 시작 화면. 로그인 만료(401)는 시작을 누를 때 처리한다
+        if (!cancelled) setFinished(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // start·answer 공통: 다음 단계를 받아 화면 상태를 바꾼다.
   async function run(load: () => Promise<DiagnosisStep>) {
@@ -63,6 +82,10 @@ export default function DiagnosisPage() {
     if (!loading) void run(() => diagnosisSource.start())
   }
 
+  function handleRestart() {
+    if (window.confirm(RESTART_CONFIRM)) handleStart()
+  }
+
   function handleSubmit() {
     const question = step?.question
     if (loading || !question) return
@@ -71,6 +94,28 @@ export default function DiagnosisPage() {
       return
     }
     void run(() => diagnosisSource.answer(question.id, selected))
+  }
+
+  if (phase === 'intro' && finished) {
+    return (
+      <section className="form-page">
+        <h1>진단</h1>
+        <p className="form-hint">이미 진단을 끝냈어요. 결과 화면에서 아는 개념과 보충할 개념을 볼 수 있어요.</p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="form">
+          <button type="button" onClick={() => navigate('/result')}>
+            결과 보기
+          </button>
+          <button type="button" className="secondary" onClick={handleRestart} disabled={loading}>
+            {loading ? '불러오는 중…' : '다시 진단하기 (지금 결과는 지워져요)'}
+          </button>
+        </div>
+      </section>
+    )
   }
 
   if (phase === 'intro') {
@@ -86,8 +131,8 @@ export default function DiagnosisPage() {
           </p>
         )}
         <div className="form">
-          <button type="button" onClick={handleStart} disabled={loading}>
-            {loading ? '불러오는 중…' : '진단 시작'}
+          <button type="button" onClick={handleStart} disabled={loading || finished === null}>
+            {loading || finished === null ? '불러오는 중…' : '진단 시작'}
           </button>
         </div>
       </section>
