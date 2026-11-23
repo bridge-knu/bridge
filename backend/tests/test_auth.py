@@ -375,3 +375,70 @@ def test_startup_repairs_demo_stuck_mid_diagnosis(api_client, db, login):
 
     ensure_demo_user(db)  # 서버 재시작
     assert api_client.get("/diagnosis/result", headers=headers).status_code == 200
+
+
+DEMO_PROFILE_BODY = {
+    "completedCourses": [{"course": "C", "grade": "A+"}],
+    "gapMonths": 3,
+    "targetCourse": "DS",
+    "returnDate": "2026-12-01",
+    "dailyMinutes": 30,
+}
+
+
+def test_demo_cannot_change_profile(api_client, login):
+    headers = auth_header(login("demo", "0000"))
+    before = api_client.get("/plan", headers=headers).json()
+    r = api_client.put("/profile", json=DEMO_PROFILE_BODY, headers=headers)
+    assert r.status_code == 403
+    assert r.json() == {
+        "detail": "공용 데모 계정은 프로필을 바꿀 수 없어요. 체험하기로 나만의 계정을 만들어 보세요",
+        "code": "DEMO_READ_ONLY",
+    }
+    after = api_client.get("/plan", headers=headers).json()
+    assert (after["returnDate"], after["dailyMinutes"]) == (before["returnDate"], before["dailyMinutes"])
+    assert after["returnDate"] == "2027-03-02"
+
+
+def test_trial_can_change_profile(api_client):
+    headers = auth_header(trial(api_client)["token"])
+    assert api_client.put("/profile", json=DEMO_PROFILE_BODY, headers=headers).status_code == 200
+    plan = api_client.get("/plan", headers=headers).json()
+    assert (plan["returnDate"], plan["dailyMinutes"]) == ("2026-12-01", 30)
+
+
+def test_startup_restores_changed_demo_profile(api_client, db, login):
+    from app.models import Profile
+    from app.seed import ensure_demo_user
+
+    # 막기 전에 누가 demo 프로필을 바꿔 둔 상태
+    row = db.get(Profile, demo_user_id(db))
+    row.return_date, row.daily_minutes = datetime(2026, 12, 1).date(), 30
+    db.commit()
+    headers = auth_header(login("demo", "0000"))
+    api_client.post("/plan/generate", headers=headers)
+    assert api_client.get("/plan", headers=headers).json()["dailyMinutes"] == 30
+
+    ensure_demo_user(db)  # 서버 재시작
+    plan = api_client.get("/plan", headers=headers).json()
+    assert (plan["returnDate"], plan["dailyMinutes"]) == ("2027-03-02", 60)
+    assert all(len(d["blocks"]) <= 2 for d in plan["days"])  # 하루 60분 = 30분 블록 2개로 다시 배치
+
+
+def test_startup_clears_demo_done_blocks_and_saved_code(api_client, db, login):
+    from app.seed import ensure_demo_user
+
+    headers = auth_header(login("demo", "0000"))
+    block_id = api_client.get("/plan", headers=headers).json()["days"][0]["blocks"][0]["blockId"]
+    # 앞사람이 demo로 블록을 끝내고 코드를 저장해 둔 상태
+    assert api_client.put(f"/code/{block_id}", json={"code": "int main(void) { return 0; }"}, headers=headers).status_code == 200
+    api_client.post(f"/blocks/{block_id}/complete", headers=headers)
+    plan = api_client.get("/plan", headers=headers).json()
+    assert plan["todayRemainingMinutes"] == 30
+
+    ensure_demo_user(db)  # 서버 재시작
+    plan = api_client.get("/plan", headers=headers).json()
+    assert plan["todayRemainingMinutes"] == 60
+    assert not any(b["done"] for d in plan["days"] for b in d["blocks"])
+    block = api_client.get(f"/blocks/{block_id}", headers=headers).json()
+    assert block["savedCode"] is None and block["done"] is False

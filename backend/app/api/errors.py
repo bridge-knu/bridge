@@ -23,6 +23,7 @@ ERRORS: dict[str, tuple[int, str]] = {
     "JOB_NOT_FOUND": (404, "실행 작업을 찾을 수 없어요"),
     "SERVICE_UNAVAILABLE": (503, "잠시 후 다시 시도해 주세요"),
     "TOO_MANY_REQUESTS": (429, "요청이 너무 많아요. 잠시 후 다시 시도해 주세요"),
+    "DEMO_READ_ONLY": (403, "공용 데모 계정은 프로필을 바꿀 수 없어요. 체험하기로 나만의 계정을 만들어 보세요"),
 }
 
 
