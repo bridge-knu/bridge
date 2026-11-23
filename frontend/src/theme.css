@@ -2,25 +2,49 @@
  * 브릿지 디자인 값 (색·글꼴·여백·글자 크기)
  * 화면 스타일(index.css)과 에디터 테마(block/CodeEditor.tsx)는 여기 변수만 쓴다.
  *
- * 콘셉트: 스터디 플래너. 블루블랙 잉크로 쓴 종이 위에, 노란 형광펜은 "오늘"에만 긋는다.
+ * 콘셉트: 스터디 플래너. 블루블랙 잉크 + 회색 바탕 위 흰 카드, 노란 형광펜은 "오늘"에만 긋는다.
  * 글자 대비는 모두 WCAG AA(4.5:1) 이상으로 맞췄다.
  */
 
-/* 제목용 글꼴: 마루 부리 Bold (NAVER, SIL OFL 1.1, public/fonts/OFL.txt)
-   KS X 1001 한글 2,350자 + 영문·숫자·문장 부호만 남긴 파일 (약 200KB). 없는 글자는 본문 글꼴로 보인다 */
+/* 글꼴: Pretendard 하나 (길형진, SIL OFL 1.1, public/fonts/LICENSE.txt)
+   배포판의 woff2-subset (KS X 1001 한글 + 영문·기호) 파일을 그대로 쓴다. 없는 글자는 맑은 고딕으로 보인다 */
 @font-face {
-  font-family: 'Bridge Heading';
-  src: url('/fonts/maruburi-bold.woff2') format('woff2');
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Regular.subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-SemiBold.subset.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Bold.subset.woff2') format('woff2');
   font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-ExtraBold.subset.woff2') format('woff2');
+  font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
   /* ---- 색 ---- */
-  --color-paper: #fcfcfa; /* 바탕 (종이) */
+  --color-paper: #f3f4f6; /* 바탕 */
   --color-surface: #ffffff; /* 입력칸·에디터 */
-  --color-sunk: #f2f4f7; /* 코드·출력처럼 한 단계 들어간 면 */
+  --color-sunk: #e8ebef; /* 코드·출력처럼 한 단계 들어간 면 */
   --color-ink: #1f3550; /* 본문 글자, 기본 버튼 */
   --color-ink-hover: #152640;
   --color-ink-tint: #e9edf3; /* 선택된 항목 바탕 */
@@ -56,9 +80,8 @@
   --code-selection: #d6e1f0;
 
   /* ---- 글꼴 ---- */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕',
-    'Noto Sans KR', 'Segoe UI', sans-serif;
-  --font-heading: 'Bridge Heading', var(--font-sans);
+  --font-sans: 'Pretendard', 'Malgun Gothic', sans-serif;
+  --font-heading: var(--font-sans);
   --font-mono: 'Cascadia Code', Consolas, 'D2Coding', ui-monospace, monospace;
 
   /* ---- 글자 크기 5단계 ---- */
@@ -66,10 +89,14 @@
   --text-md: 1rem; /* 16px: 본문 */
   --text-lg: 1.25rem; /* 20px: 소제목 */
   --text-xl: 1.75rem; /* 28px: 화면 제목 */
-  --text-display: 3rem; /* 48px: D-N */
+  --text-display: 4.5rem; /* 72px: D-N */
 
   --leading-tight: 1.25;
   --leading-body: 1.6;
+
+  --weight-heading: 800;
+  --tracking-heading: -0.025em;
+  --tracking-display: -0.04em;
 
   /* ---- 여백 (4px 단위) ---- */
   --space-1: 0.25rem;
@@ -81,8 +108,10 @@
   --space-7: 3rem;
 
   /* ---- 모양 ---- */
-  --radius-sm: 3px; /* 입력칸·버튼 */
-  --radius-md: 6px; /* 영상·에디터 */
+  --radius-sm: 6px; /* 배지·체크 칸 */
+  --radius-md: 10px; /* 입력칸·선택지·영상·에디터 */
+  --radius-button: 12px;
+  --radius-card: 20px; /* 플랜 날짜 카드·안내 카드 */
   --border: 1px solid var(--color-rule);
   --page-width: 960px;
   --page-gutter: var(--space-5);
@@ -91,7 +120,7 @@
 @media (max-width: 600px) {
   :root {
     --text-xl: 1.5rem;
-    --text-display: 2.5rem;
+    --text-display: 3.5rem;
     --page-gutter: var(--space-4);
   }
 }
