@@ -35,7 +35,8 @@ function ConceptNodeView({ data }: NodeProps<ConceptNode>) {
       </strong>
       <span>
         <span className="visually-hidden">{data.weak ? '보충할 개념, ' : '아는 개념, '}</span>
-        {percent}%{data.blockId ? '' : ' · 블록 준비 중'}
+        {percent}% · {data.concept.source === 'diagnosed' ? '진단 확인' : '추정'}
+        {data.blockId ? '' : ' · 블록 준비 중'}
       </span>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </>
@@ -173,6 +174,7 @@ export default function ResultPage() {
   }
 
   const weakCount = graph.nodes.filter((n) => n.data.weak).length
+  const diagnosedCount = graph.nodes.filter((n) => n.data.concept.source === 'diagnosed').length
 
   return (
     <section>
@@ -180,6 +182,10 @@ export default function ResultPage() {
       <p className="form-hint">
         개념 {graph.nodes.length}개 중 {weakCount}개를 보충하면 돼요. 위에서 아래로 선수 개념 → 목표 개념 순서예요.
         노드를 누르면 학습 블록으로 이동해요.
+      </p>
+      <p className="concept-source-summary">
+        <strong>{diagnosedCount}개</strong>는 진단으로 확인했고(위 개념을 맞히면 그 바탕 개념도 함께 확인돼요), 나머지{' '}
+        <strong>{graph.nodes.length - diagnosedCount}개</strong>는 이수 성적과 공백 기간으로 추정했어요.
       </p>
       <ul className="concept-legend">
         <li>

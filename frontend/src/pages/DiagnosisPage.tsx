@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, getDiagnosisResult, setAuthToken } from '../api.ts'
 import { classifyDiagnosisError } from '../diagnosis/errors.ts'
+import { diagnosisReason } from '../diagnosis/reason.ts'
 import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
 type Phase = 'intro' | 'question' | 'done'
@@ -29,6 +30,8 @@ export default function DiagnosisPage() {
   // 이미 끝낸 진단이 있는지 (null: 확인 중). 있으면 "진단 시작" 대신 결과 보기를 먼저 보여 준다.
   // 다시 시작하면 서버가 결과를 지우므로, 같이 쓰는 데모 계정에서 실수로 지우지 않게 한다.
   const [finished, setFinished] = useState<boolean | null>(null)
+  // 지금 문제를 내는 이유 (직전 문제의 정답 여부와 선수 관계로 만든 한 줄)
+  const [reason, setReason] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -46,14 +49,17 @@ export default function DiagnosisPage() {
   }, [])
 
   // start·answer 공통: 다음 단계를 받아 화면 상태를 바꾼다.
-  async function run(load: () => Promise<DiagnosisStep>) {
+  async function run(load: () => Promise<DiagnosisStep>, isStart: boolean) {
     if (inFlight.current) return
     inFlight.current = true
     setLoading(true)
     setError(null)
     setNeedsRestart(false)
     try {
+      // 시작이면 직전 문제가 없다. 답을 낸 경우엔 방금 푼 문제가 step에 남아 있다
+      const prev = isStart ? null : (step?.question ?? null)
       const next = await load()
+      setReason(diagnosisReason({ prev, correct: isStart ? null : next.correct, next: next.question }))
       setStep(next)
       setSelected(null)
       setPhase(next.question ? 'question' : 'done')
@@ -79,7 +85,7 @@ export default function DiagnosisPage() {
   }
 
   function handleStart() {
-    if (!loading) void run(() => diagnosisSource.start())
+    if (!loading) void run(() => diagnosisSource.start(), true)
   }
 
   function handleRestart() {
@@ -93,7 +99,7 @@ export default function DiagnosisPage() {
       setError(NEED_CHOICE)
       return
     }
-    void run(() => diagnosisSource.answer(question.id, selected))
+    void run(() => diagnosisSource.answer(question.id, selected), false)
   }
 
   if (phase === 'intro' && finished) {
@@ -163,6 +169,12 @@ export default function DiagnosisPage() {
         </span>
         <progress value={number} max={total} aria-label="진단 진행률" />
       </div>
+
+      {reason && (
+        <p className="diagnosis-reason" role="status">
+          {reason}
+        </p>
+      )}
 
       <h1 className="diagnosis-prompt">{question.prompt}</h1>
 
