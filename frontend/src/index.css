@@ -437,6 +437,19 @@ select {
   font-size: var(--text-sm);
 }
 
+.login-demo p {
+  margin: 0;
+}
+
+.login-demo .block-button {
+  width: 100%;
+  margin: var(--space-3) 0;
+}
+
+.login-demo-fallback {
+  color: var(--color-ink-soft);
+}
+
 .login-demo strong {
   font-size: var(--text-md);
   font-weight: 800;

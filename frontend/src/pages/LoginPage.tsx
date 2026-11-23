@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, login, setAuthToken } from '../api.ts'
+import { ApiError, login, setAuthToken, startTrial } from '../api.ts'
 
 const PIN_PATTERN = /^\d{4}$/
 
@@ -32,10 +32,27 @@ export default function LoginPage() {
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [trialLoading, setTrialLoading] = useState(false)
+  const busy = loading || trialLoading
+
+  // 체험하기: 데모 데이터가 채워진 나만의 계정을 새로 받아 바로 플랜으로
+  async function handleTrial() {
+    if (busy) return
+    setError(null)
+    setTrialLoading(true)
+    try {
+      const res = await startTrial()
+      setAuthToken(res.token)
+      navigate('/plan', { replace: true })
+    } catch (err) {
+      setError(`${errorMessage(err)} (데모 계정 demo / 0000으로도 들어올 수 있어요)`)
+      setTrialLoading(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (loading) return
+    if (busy) return
 
     const id = loginId.trim()
     const invalid = validate(id, pin)
@@ -74,10 +91,18 @@ export default function LoginPage() {
       <div className="login-panel">
         <h1>로그인</h1>
         <p className="login-hint">처음 쓰는 아이디면 자동으로 가입돼요.</p>
-        <p className="login-demo">
-          둘러보기만 하려면 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>으로 들어오세요. 진단부터
-          해 보려면 새 아이디로 들어오면 돼요.
-        </p>
+        <div className="login-demo">
+          <p>
+            가입 없이 바로 둘러보려면 체험하기를 누르세요. 진단까지 끝난 나만의 체험 계정이 만들어져서, 진단을
+            다시 해 봐도 다른 사람에게 영향이 없어요.
+          </p>
+          <button type="button" className="block-button secondary" onClick={handleTrial} disabled={busy}>
+            {trialLoading ? '체험 계정 만드는 중…' : '체험하기'}
+          </button>
+          <p className="login-demo-fallback">
+            공용 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>으로도 들어올 수 있어요.
+          </p>
+        </div>
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <label>
@@ -93,7 +118,7 @@ export default function LoginPage() {
               maxLength={30}
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
-              disabled={loading}
+              disabled={busy}
             />
           </label>
 
@@ -107,7 +132,7 @@ export default function LoginPage() {
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              disabled={loading}
+              disabled={busy}
             />
           </label>
 
@@ -117,7 +142,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          <button type="submit" disabled={loading}>
+          <button type="submit" disabled={busy}>
             {loading ? '로그인 중…' : '로그인'}
           </button>
         </form>
