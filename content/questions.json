@@ -251,6 +251,20 @@
     "answer": 1
   },
   {
+    "id": "q-pointer-4",
+    "concept": "pointer",
+    "type": "choice",
+    "prompt": "아래 코드를 실행한 뒤 a의 값은?",
+    "code": "int a = 10;\nint *p = &a;\n*p += 5;",
+    "choices": [
+      "10",
+      "5",
+      "15",
+      "컴파일 에러"
+    ],
+    "answer": 2
+  },
+  {
     "id": "q-string-1",
     "concept": "string",
     "type": "choice",
@@ -506,6 +520,19 @@
     "answer": 2
   },
   {
+    "id": "q-binary_tree-3",
+    "concept": "binary_tree",
+    "type": "choice",
+    "prompt": "루트가 4, 4의 왼쪽 자식이 2(자식 1, 3), 오른쪽 자식이 5인 이진 트리를 중위 순회한 결과는?",
+    "choices": [
+      "4 2 1 3 5",
+      "1 2 3 4 5",
+      "1 3 2 5 4",
+      "4 2 5 1 3"
+    ],
+    "answer": 1
+  },
+  {
     "id": "q-heap-1",
     "concept": "heap",
     "type": "choice",
@@ -571,6 +598,19 @@
     "answer": 0
   },
   {
+    "id": "q-bst-4",
+    "concept": "bst",
+    "type": "choice",
+    "prompt": "빈 이진 탐색 트리에 7, 2, 9, 5를 차례로 넣으면 5는 어디에 위치하나?",
+    "choices": [
+      "2의 오른쪽 자식",
+      "9의 왼쪽 자식",
+      "7의 오른쪽 자식",
+      "2의 왼쪽 자식"
+    ],
+    "answer": 0
+  },
+  {
     "id": "q-graph-1",
     "concept": "graph",
     "type": "choice",
@@ -608,6 +648,19 @@
       "0 3 1 2"
     ],
     "answer": 2
+  },
+  {
+    "id": "q-graph-4",
+    "concept": "graph",
+    "type": "choice",
+    "prompt": "간선이 0-1, 0-3, 1-2, 3-4, 2-4인 그래프를 0번부터 너비 우선 탐색(BFS)한다. 인접한 정점은 번호가 작은 것부터 방문할 때 방문 순서는?",
+    "choices": [
+      "0 1 2 4 3",
+      "0 1 3 2 4",
+      "0 3 1 4 2",
+      "0 1 2 3 4"
+    ],
+    "answer": 1
   },
   {
     "id": "q-sorting-1",
