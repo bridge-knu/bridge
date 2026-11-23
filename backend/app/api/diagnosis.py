@@ -27,6 +27,9 @@ from app.engine import diagnosis as engine
 from app.engine.graph import Graph
 from app.models import ConceptState, DiagnosisAnswer, DiagnosisSession, PlanInfo, User
 
+# 공용 데모 계정 아이디 (app.seed가 이 값으로 만든다)
+DEMO_LOGIN_ID = "demo"
+
 router = APIRouter(prefix="/diagnosis", tags=["diagnosis"])
 
 # 프로필을 입력하기 전에 진단을 시작하면: 이수 과목 없음, 목표 자료구조
@@ -91,13 +94,18 @@ def advance(db: Session, user_id: int, state: engine.DiagnosisState, correct: bo
 @router.post(
     "/start",
     response_model=DiagnosisStep,
+    responses=responses("DIAGNOSIS_FINISHED"),
     summary="진단 시작, 첫 문제 반환",
     description=(
         "프로필(이수 과목·성적·공백)로 망각 추정을 해서 시작점을 정한다. 다시 시작하면 처음부터 새로 한다. "
-        "물어볼 개념이 없으면 바로 done: true."
+        "물어볼 개념이 없으면 바로 done: true. "
+        "공용 데모 계정(demo)은 여러 명이 같이 쓰므로 다시 시작할 수 없다 (400 DIAGNOSIS_FINISHED)."
     ),
 )
 def start(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 한 명이 demo로 진단을 시작하고 나가면 다른 사람이 결과를 못 보므로 막는다 (체험 계정은 가능)
+    if user.login_id == DEMO_LOGIN_ID:
+        raise ApiError("DIAGNOSIS_FINISHED")
     state = engine.start_diagnosis(engine_profile(db, user.id), get_graph())
     return advance(db, user.id, state, None)
 

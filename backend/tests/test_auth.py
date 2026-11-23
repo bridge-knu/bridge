@@ -300,10 +300,14 @@ def auth_header(token):
 
 
 def test_trial_makes_new_account_each_time(api_client, db):
+    def trial_ids():
+        return set(db.scalars(select(User.login_id).where(User.login_id.like("demo-%"))).all())
+
+    before = trial_ids()
     first, second = trial(api_client), trial(api_client)
     assert first["isNewUser"] is False
-    ids = db.scalars(select(User.login_id).where(User.login_id.like("demo-%"))).all()
-    assert len(ids) == 2 and all(len(i) == len("demo-") + 6 for i in ids)
+    new = trial_ids() - before
+    assert len(new) == 2 and all(len(i) == len("demo-") + 6 for i in new)
     assert first["token"] != second["token"]
 
 
@@ -337,3 +341,37 @@ def test_trial_rate_limit_is_separate_from_signup(api_client, monkeypatch):
     assert api_client.post("/auth/demo").status_code == 200
     r = api_client.post("/auth/demo")
     assert r.status_code == 429 and r.json()["code"] == "TOO_MANY_REQUESTS"
+
+
+# ---- 공용 데모 계정 보호 ----
+
+
+def test_demo_cannot_restart_diagnosis(api_client, login):
+    headers = auth_header(login("demo", "0000"))
+    r = api_client.post("/diagnosis/start", headers=headers)
+    assert r.status_code == 400
+    # 화면은 이 문구로 "이미 끝난 진단 → 완료 화면"을 고른다
+    assert r.json() == {"detail": "진단이 이미 끝났어요", "code": "DIAGNOSIS_FINISHED"}
+    assert api_client.get("/diagnosis/result", headers=headers).status_code == 200
+
+
+def test_trial_and_normal_users_can_restart_diagnosis(api_client, login):
+    assert api_client.post("/diagnosis/start", headers=auth_header(trial(api_client)["token"])).status_code == 200
+    assert api_client.post("/diagnosis/start", headers=auth_header(login("kim"))).status_code == 200
+
+
+def test_startup_repairs_demo_stuck_mid_diagnosis(api_client, db, login):
+    from app.api.diagnosis import engine_profile, save_state
+    from app.content import get_graph
+    from app.engine import diagnosis as engine
+    from app.seed import ensure_demo_user
+
+    # 예전 서버에서 누가 demo로 진단을 다시 시작하고 나간 상태
+    uid = demo_user_id(db)
+    save_state(db, uid, engine.start_diagnosis(engine_profile(db, uid), get_graph()))
+    db.commit()
+    headers = auth_header(login("demo", "0000"))
+    assert api_client.get("/diagnosis/result", headers=headers).status_code == 400
+
+    ensure_demo_user(db)  # 서버 재시작
+    assert api_client.get("/diagnosis/result", headers=headers).status_code == 200

@@ -1,6 +1,7 @@
 """심사위원용 데모 계정.
 
-- 공용 데모 계정(demo / 0000): 서버가 시작할 때 없으면 만든다.
+- 공용 데모 계정(demo / 0000): 서버가 시작할 때 없으면 만들고, 진단이 중간에 멈춰 있으면 다시 채운다.
+  진단 다시 시작은 API에서 막는다 (POST /diagnosis/start).
 - 체험 계정(demo-xxxxxx): 로그인 화면의 "체험하기"를 누를 때마다 새로 만든다.
   여러 명이 demo 하나를 같이 쓰면 한 명이 진단을 다시 할 때 다른 사람 결과도 바뀌기 때문이다.
 
@@ -15,13 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.diagnosis import engine_profile, save_state
+from app.api.diagnosis import DEMO_LOGIN_ID, engine_profile, load_state, save_state
 from app.content import get_graph
 from app.engine import diagnosis as engine
-from app.models import DiagnosisSession, Profile, User
+from app.models import Profile, User
 from app.security import hash_pin
 
-DEMO_LOGIN_ID = "demo"
 DEMO_PIN = "0000"
 TRIAL_PREFIX = "demo-"
 
@@ -40,7 +40,9 @@ def fill_demo_data(db: Session, user_id: int) -> None:
     if db.get(Profile, user_id) is None:
         db.add(Profile(user_id=user_id, **DEMO_PROFILE))
         db.flush()
-    if db.get(DiagnosisSession, user_id) is None:
+    # 진단이 없거나 중간에 멈춰 있으면(예전에 누가 demo로 다시 시작하고 나감) 다시 채운다
+    state = load_state(db, user_id)
+    if state is None or not state.done:
         seed_demo_diagnosis(db, user_id)
 
 
