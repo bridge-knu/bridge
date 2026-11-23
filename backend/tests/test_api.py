@@ -37,6 +37,23 @@ def test_save_profile(client):
     assert "updatedAt" in body
 
 
+def test_get_profile_returns_saved_values(client):
+    saved = client.put("/profile", json=PROFILE).json()
+    r = client.get("/profile")
+    assert r.status_code == 200
+    assert r.json() == saved
+
+
+def test_get_profile_before_saving_is_404(client):
+    r = client.get("/profile")
+    assert r.status_code == 404
+    assert r.json() == {"detail": "아직 프로필을 입력하지 않았어요", "code": "PROFILE_NOT_FOUND"}
+
+
+def test_get_profile_needs_login(api_client):
+    assert api_client.get("/profile").status_code == 401
+
+
 @pytest.mark.parametrize(
     "change",
     [

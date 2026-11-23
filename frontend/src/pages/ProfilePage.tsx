@@ -1,15 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ApiError,
   GRADES,
+  getProfile,
   saveProfile,
   setAuthToken,
   type CompletedCourse,
   type CourseCode,
-  type Grade,
   type Profile,
 } from '../api.ts'
+import { NOT_TAKEN, emptyForm, profileToForm, type FormValues, type GradeSelection } from '../profile/form.ts'
 
 // 과목 id는 content/concepts.json의 course 값과 같다.
 const COURSES: { id: CourseCode; name: string }[] = [
@@ -22,25 +23,12 @@ const GAP_MONTHS_MAX = 120
 const DAILY_MINUTES_MIN = 30
 const DAILY_MINUTES_MAX = 600
 
-// 드롭다운의 "미수강" 값. 이 값인 과목은 completedCourses에서 뺀다.
-const NOT_TAKEN = ''
-
-type GradeSelection = Grade | typeof NOT_TAKEN
-
 // 로컬 시간 기준 오늘 날짜 (YYYY-MM-DD)
 function today(): string {
   const d = new Date()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${d.getFullYear()}-${mm}-${dd}`
-}
-
-interface FormValues {
-  grades: Record<string, GradeSelection>
-  gapMonths: string
-  targetCourse: string
-  returnDate: string
-  dailyMinutes: string
 }
 
 // 문제가 없으면 Profile, 있으면 안내 문구를 돌려준다.
@@ -89,21 +77,42 @@ function errorMessage(err: unknown): string {
 
 export default function ProfilePage() {
   const navigate = useNavigate()
-  const [values, setValues] = useState<FormValues>({
-    grades: Object.fromEntries(COURSES.map((c) => [c.id, NOT_TAKEN])),
-    gapMonths: '',
-    targetCourse: '',
-    returnDate: '',
-    dailyMinutes: '',
-  })
+  const [values, setValues] = useState<FormValues>(() => emptyForm(COURSES.map((c) => c.id)))
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // 저장된 프로필을 불러와 채웠는지 (안내 문구용)
+  const [loadedSaved, setLoadedSaved] = useState(false)
+  // 불러오기 전에 사용자가 먼저 입력을 시작했으면 덮어쓰지 않는다
+  const touched = useRef(false)
+
+  // 다시 들어왔을 때 저장된 값을 채워 보여 준다. 아직 입력 전(404)이거나 실패하면 지금처럼 빈 양식
+  useEffect(() => {
+    let cancelled = false
+    getProfile()
+      .then((profile) => {
+        if (cancelled || touched.current) return
+        setValues(profileToForm(profile, COURSES.map((c) => c.id)))
+        setLoadedSaved(true)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        if (err instanceof ApiError && err.status === 401) {
+          setAuthToken(null)
+          navigate('/login', { replace: true })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [navigate])
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
+    touched.current = true
     setValues((prev) => ({ ...prev, [key]: value }))
   }
 
   function updateGrade(courseId: string, grade: GradeSelection) {
+    touched.current = true
     setValues((prev) => ({ ...prev, grades: { ...prev.grades, [courseId]: grade } }))
   }
 
@@ -137,7 +146,11 @@ export default function ProfilePage() {
   return (
     <section className="form-page">
       <h1>프로필 입력</h1>
-      <p className="form-hint">입력한 내용으로 진단 시작점과 학습 계획을 정해요.</p>
+      <p className="form-hint">
+        {loadedSaved
+          ? '저장된 프로필을 불러왔어요. 바꿔서 저장하면 학습 계획을 새 값으로 다시 짜요.'
+          : '입력한 내용으로 진단 시작점과 학습 계획을 정해요.'}
+      </p>
 
       <form className="form" onSubmit={handleSubmit} noValidate>
         <fieldset disabled={loading}>
@@ -146,6 +159,7 @@ export default function ProfilePage() {
             <label key={course.id}>
               {course.name}
               <select
+                name={`grade-${course.id}`}
                 value={values.grades[course.id]}
                 onChange={(e) => updateGrade(course.id, e.target.value as GradeSelection)}
               >
@@ -179,6 +193,7 @@ export default function ProfilePage() {
         <label>
           목표 과목
           <select
+            name="targetCourse"
             value={values.targetCourse}
             onChange={(e) => update('targetCourse', e.target.value)}
             disabled={loading}
@@ -196,6 +211,8 @@ export default function ProfilePage() {
           복학 예정일
           <input
             type="date"
+            name="returnDate"
+            autoComplete="off"
             min={today()}
             value={values.returnDate}
             onChange={(e) => update('returnDate', e.target.value)}

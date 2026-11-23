@@ -442,3 +442,15 @@ def test_startup_clears_demo_done_blocks_and_saved_code(api_client, db, login):
     assert not any(b["done"] for d in plan["days"] for b in d["blocks"])
     block = api_client.get(f"/blocks/{block_id}", headers=headers).json()
     assert block["savedCode"] is None and block["done"] is False
+
+
+def test_demo_and_trial_can_read_demo_profile(api_client, login):
+    for headers in (auth_header(login("demo", "0000")), auth_header(trial(api_client)["token"])):
+        body = api_client.get("/profile", headers=headers).json()
+        assert body["completedCourses"] == [{"course": "C", "grade": "B0"}]
+        assert (body["gapMonths"], body["targetCourse"], body["returnDate"], body["dailyMinutes"]) == (
+            24,
+            "DS",
+            "2027-03-02",
+            60,
+        )

@@ -19,6 +19,7 @@ ERRORS: dict[str, tuple[int, str]] = {
     "DIAGNOSIS_FINISHED": (400, "진단이 이미 끝났어요"),
     "QUESTION_MISMATCH": (400, "지금 풀고 있는 문제가 아니에요"),
     "DIAGNOSIS_NOT_FINISHED": (400, "진단을 먼저 끝내 주세요"),
+    "PROFILE_NOT_FOUND": (404, "아직 프로필을 입력하지 않았어요"),
     "BLOCK_NOT_FOUND": (404, "블록을 찾을 수 없어요"),
     "JOB_NOT_FOUND": (404, "실행 작업을 찾을 수 없어요"),
     "SERVICE_UNAVAILABLE": (503, "잠시 후 다시 시도해 주세요"),
