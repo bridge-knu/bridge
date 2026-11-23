@@ -3,7 +3,7 @@ import dagre from '@dagrejs/dagre'
 import { MarkerType, Position, type Edge, type Node } from '@xyflow/react'
 import type { ConceptResult } from '../api.ts'
 
-/** 이 값 미만이면 보충이 필요한 개념(빨강), 이상이면 아는 개념(초록) */
+/** 이 값 미만이면 보충이 필요한 개념(주황·!), 이상이면 아는 개념(파랑·✓) */
 export const MASTERY_THRESHOLD = 0.6
 
 const NODE_WIDTH = 160

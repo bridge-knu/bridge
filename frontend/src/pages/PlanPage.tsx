@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { generatePlan, getPlan, setAuthToken, type Plan } from '../api.ts'
 import {
   classifyPlanError,
+  dDayLabel,
+  daysUntil,
   formatDate,
   planErrorMessage,
   todayGuideText,
@@ -18,12 +20,15 @@ type State =
 
 function DayCard({ day, view }: { day: PlanDayView; view: PlanView }) {
   return (
-    <section className={`plan-day${day.isToday ? ' today' : ''}`} aria-label={formatDate(day.date)}>
+    <section
+      className={`plan-day${day.isToday ? ' today' : ''}${day.isPast && !day.allDone ? ' past' : ''}${day.allDone ? ' done' : ''}`}
+      aria-label={formatDate(day.date)}
+    >
       <header className="plan-day-header">
         <h2>
           {day.isToday && <span className="plan-badge today">오늘</span>}
           {day.isPast && !day.allDone && <span className="plan-badge past">지난 날</span>}
-          {formatDate(day.date)}
+          <span className="plan-day-date">{formatDate(day.date)}</span>
         </h2>
         <span className="plan-day-meta">
           {day.allDone ? '모두 완료' : `${day.blocks.length}개 · ${day.minutes}분`}
@@ -169,8 +174,13 @@ export default function PlanPage() {
 
   return (
     <section className="plan">
+      <p className="plan-countdown">
+        <span className="plan-countdown-label">복학까지</span>
+        <span className="plan-dday">{dDayLabel(daysUntil(view.todayDate, view.returnDate))}</span>
+      </p>
+
       <div className="plan-head">
-        <div>
+        <div className="plan-title">
           <h1>학습 플랜</h1>
           <p className="form-hint">
             오늘 {formatDate(view.todayDate)} · 복학일 {formatDate(view.returnDate)}까지 · 하루 {view.dailyMinutes}분 · 블록 {view.doneBlocks}/
@@ -194,10 +204,14 @@ export default function PlanPage() {
         {view.days.map((day) => (
           <DayCard key={day.date} day={day} view={view} />
         ))}
+        <p className="plan-end">
+          <span className="plan-end-label">복학일</span>
+          {formatDate(view.returnDate)}
+        </p>
       </div>
 
       {view.deferred !== null && (
-        <section className="plan-deferred" aria-label="미룬 개념">
+        <section className={`plan-deferred${view.deferred.length === 0 ? ' empty' : ''}`} aria-label="미룬 개념">
           <h2>복학 후로 미룬 개념</h2>
           {view.deferred.length === 0 ? (
             <p className="form-hint">시간 안에 모든 개념을 배울 수 있어요. 미룬 개념이 없어요.</p>

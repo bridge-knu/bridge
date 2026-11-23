@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ApiError, type Plan, type PlanBlock } from '../api.ts'
 import {
   classifyPlanError,
+  dDayLabel,
+  daysUntil,
   formatDate,
   localToday,
   planErrorMessage,
@@ -223,6 +225,19 @@ describe('날짜', () => {
   it('formatDate는 "11월 21일 (토)"', () => {
     expect(formatDate('2026-11-21')).toBe('11월 21일 (토)')
     expect(formatDate('2027-03-02')).toBe('3월 2일 (화)')
+  })
+
+  it('daysUntil은 두 날짜 사이 날 수 (월·연도 넘김, 서머타임 영향 없음)', () => {
+    expect(daysUntil('2026-11-23', '2026-11-23')).toBe(0)
+    expect(daysUntil('2026-11-23', '2027-03-02')).toBe(99)
+    expect(daysUntil('2027-02-28', '2027-03-01')).toBe(1)
+    expect(daysUntil('2027-03-05', '2027-03-02')).toBe(-3)
+  })
+
+  it('dDayLabel은 D-N, 당일 D-Day, 지나면 D+N', () => {
+    expect(dDayLabel(42)).toBe('D-42')
+    expect(dDayLabel(0)).toBe('D-Day')
+    expect(dDayLabel(-3)).toBe('D+3')
   })
 })
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Background,
   Controls,
@@ -23,17 +23,38 @@ type State =
 
 function ConceptNodeView({ data }: NodeProps<ConceptNode>) {
   const percent = Math.round(data.concept.mastery * 100)
-  return (
-    <div
-      className="concept-node-body"
-      title={data.blockId ? '눌러서 학습 블록으로 이동' : '아직 연결된 학습 블록이 없어요'}
-    >
+  const content = (
+    <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
-      <strong>{data.label}</strong>
+      <strong>
+        <span className="concept-icon" aria-hidden="true">
+          {data.weak ? '!' : '✓'}
+        </span>
+        {data.label}
+      </strong>
       <span>
+        <span className="visually-hidden">{data.weak ? '보충할 개념, ' : '아는 개념, '}</span>
         {percent}%{data.blockId ? '' : ' · 블록 준비 중'}
       </span>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
+    </>
+  )
+
+  // 블록이 있는 개념은 진짜 링크로 만들어 마우스·키보드(Tab, Enter) 모두 블록으로 이동하게 한다
+  if (data.blockId) {
+    return (
+      <Link
+        to={`/blocks/${encodeURIComponent(data.blockId)}`}
+        className="concept-node-body concept-link"
+        title="눌러서 학습 블록으로 이동"
+      >
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <div className="concept-node-body" title="아직 연결된 학습 블록이 없어요">
+      {content}
     </div>
   )
 }
@@ -78,8 +99,11 @@ export default function ResultPage() {
     return buildConceptGraph(state.concepts, findBlockId)
   }, [state])
 
+  // React Flow는 클릭 처리기가 없으면 노드의 마우스 이벤트를 꺼 버린다 (pointer-events: none).
+  // 노드 안 링크가 이미 이동했으면(defaultPrevented) 건너뛰고, 링크 바깥 테두리를 눌렀을 때만 여기서 이동한다.
   const handleNodeClick = useCallback<NodeMouseHandler<ConceptNode>>(
-    (_, node) => {
+    (event, node) => {
+      if (event.defaultPrevented) return
       const { blockId } = node.data
       if (blockId) navigate(`/blocks/${encodeURIComponent(blockId)}`)
     },
@@ -143,10 +167,14 @@ export default function ResultPage() {
       </p>
       <ul className="concept-legend">
         <li>
-          <span className="swatch strong" /> 아는 개념 (60% 이상)
+          <span className="swatch strong" aria-hidden="true">
+            ✓
+          </span> 아는 개념 (60% 이상)
         </li>
         <li>
-          <span className="swatch weak" /> 보충할 개념 (60% 미만)
+          <span className="swatch weak" aria-hidden="true">
+            !
+          </span> 보충할 개념 (60% 미만)
         </li>
       </ul>
       <div className="concept-graph">
@@ -158,6 +186,9 @@ export default function ResultPage() {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
+          // 노드 안의 링크가 포커스를 받으므로 노드·간선 자체는 Tab 순서에서 뺀다
+          nodesFocusable={false}
+          edgesFocusable={false}
           // 개념 20개 안팎이면 그래프가 화면보다 훨씬 길다. 기본 최소 배율(0.5)에서는 다 못 넣어서
           // 맨 위(기초 개념)가 잘리므로 더 작게 줄일 수 있게 하고, 처음 열 때 전체가 보이게 맞춘다
           minZoom={0.1}

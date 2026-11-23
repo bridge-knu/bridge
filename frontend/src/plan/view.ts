@@ -156,6 +156,21 @@ export function formatDate(date: string): string {
   return `${m}월 ${d}일 (${weekday})`
 }
 
+/** 오늘부터 복학일까지 남은 날 수 (D-N의 N). 복학일이 지났으면 음수 */
+export function daysUntil(today: string, target: string): number {
+  const toUtc = (date: string) => {
+    const [y, m, d] = date.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((toUtc(target) - toUtc(today)) / 86_400_000)
+}
+
+/** "D-42", 당일은 "D-Day", 지난 뒤는 "D+3" */
+export function dDayLabel(days: number): string {
+  if (days === 0) return 'D-Day'
+  return days > 0 ? `D-${days}` : `D+${-days}`
+}
+
 /**
  * unauthorized: 토큰 없음·만료 → 로그인 화면
  * other: 그 밖의 오류 (5xx, 네트워크 실패 등) → 안내 + 다시 시도
