@@ -9,6 +9,9 @@ type Phase = 'intro' | 'question' | 'done'
 
 const NEED_CHOICE = '보기를 하나 골라 주세요'
 const RESTART_CONFIRM = '다시 진단하면 지금 진단 결과가 지워지고 처음부터 다시 풀어요. 계속할까요?'
+// 공용 데모 계정(demo)은 서버가 다시 시작을 막는다 (400 DIAGNOSIS_FINISHED, #54)
+const RESTART_BLOCKED =
+  '공용 데모 계정은 여러 사람이 함께 써서 다시 진단할 수 없어요. 진단을 직접 해 보려면 로그아웃한 뒤 로그인 화면의 ‘체험하기’로 나만의 계정을 만들어 주세요.'
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? '잠시 후 다시 시도해 주세요'
@@ -33,6 +36,9 @@ export default function DiagnosisPage() {
   // 지금 문제를 내는 이유 (직전 문제의 정답 여부와 선수 관계로 만든 한 줄)
   // 색은 직전 답에 맞춘다 (결과 그래프와 같은 약속: 파랑 = 아는 개념, 주황 = 보충할 개념)
   const [reason, setReason] = useState<{ text: string; tone: ReasonTone } | null>(null)
+  // "다시 진단하기"로 시작했는지. 이때 서버가 막으면 완료 화면 대신 막힌 이유를 보여 준다
+  const restarting = useRef(false)
+  const [restartBlocked, setRestartBlocked] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -74,8 +80,13 @@ export default function DiagnosisPage() {
         navigate('/login', { replace: true })
         return
       }
-      // 이미 끝난 진단은 다시 시작하면 결과가 지워지므로 완료 화면으로 보낸다.
       if (kind === 'finished') {
+        // 다시 진단하기를 서버가 막음 (공용 데모 계정) → 진단을 하지 않았으니 완료 화면 대신 이유를 알려 준다
+        if (restarting.current) {
+          setRestartBlocked(true)
+          return
+        }
+        // 이미 끝난 진단은 다시 시작하면 결과가 지워지므로 완료 화면으로 보낸다.
         setPhase('done')
         return
       }
@@ -83,6 +94,7 @@ export default function DiagnosisPage() {
       setError(errorMessage(err))
     } finally {
       inFlight.current = false
+      restarting.current = false
       setLoading(false)
     }
   }
@@ -92,7 +104,9 @@ export default function DiagnosisPage() {
   }
 
   function handleRestart() {
-    if (window.confirm(RESTART_CONFIRM)) handleStart()
+    if (loading || !window.confirm(RESTART_CONFIRM)) return
+    restarting.current = true
+    handleStart()
   }
 
   function handleSubmit() {
@@ -110,6 +124,11 @@ export default function DiagnosisPage() {
       <section className="form-page">
         <h1>진단</h1>
         <p className="form-hint">이미 진단을 끝냈어요. 결과 화면에서 아는 개념과 보충할 개념을 볼 수 있어요.</p>
+        {restartBlocked && (
+          <p className="diagnosis-restart-blocked" role="status">
+            {RESTART_BLOCKED}
+          </p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -119,9 +138,11 @@ export default function DiagnosisPage() {
           <button type="button" onClick={() => navigate('/result')}>
             결과 보기
           </button>
-          <button type="button" className="secondary" onClick={handleRestart} disabled={loading}>
-            {loading ? '불러오는 중…' : '다시 진단하기 (지금 결과는 지워져요)'}
-          </button>
+          {!restartBlocked && (
+            <button type="button" className="secondary" onClick={handleRestart} disabled={loading}>
+              {loading ? '불러오는 중…' : '다시 진단하기 (지금 결과는 지워져요)'}
+            </button>
+          )}
         </div>
       </section>
     )
