@@ -199,7 +199,7 @@ cd frontend && npm install && npm run dev
 | 황준혁 | 엔진·콘텐츠, 발표 | 망각 추정·적응형 진단·역산 플랜 엔진, 개념 지도·진단 문제·학습 블록 데이터 |
 | 김민재 | 프론트·학사 안내 | 전체 화면, 개념 그래프 시각화, 블록 학습(에디터·실행·자동 저장), 학사 변경 안내, 시연 영상·테스터 운영 |
 
-- 작업을 이슈 25개로 나눠 칸반 보드로 관리해 모두 해결했고, PR 40개 이상을 머지하며 서로의 PR을 40회 넘게 리뷰·승인했습니다 ([이슈 목록](https://github.com/bridge-knu/bridge/issues?q=is%3Aissue), [PR 목록](https://github.com/bridge-knu/bridge/pulls?q=is%3Apr)).
+- 작업을 이슈 25개로 나눠 칸반 보드로 관리해 모두 해결했고, PR 40개 이상을 머지하며 서로의 PR을 40회 이상 리뷰·승인했습니다 ([이슈 목록](https://github.com/bridge-knu/bridge/issues?q=is%3Aissue), [PR 목록](https://github.com/bridge-knu/bridge/pulls?q=is%3Apr)).
 - 각자 맡은 폴더만 수정하고, 모든 변경은 PR + 팀원 1명 승인 후 merge했습니다 ([개발 규칙](docs/CONTRIBUTING.md)).
 - 프론트·백엔드·엔진이 만나는 API 형식(로그인, 프로필, 진단)은 구현 전에 먼저 합의하고 세 명이 같은 규격에 맞췄습니다.
 - 매일 밤 10시 스탠드업으로 진행 상황을 맞췄습니다.
