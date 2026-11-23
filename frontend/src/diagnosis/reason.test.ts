@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ancestorsOf, diagnosisReason, withEulReul, withEunNeun } from './reason.ts'
+import { ancestorsOf, diagnosisReason, reasonTone, withEulReul, withEunNeun } from './reason.ts'
 
 const pointer = { concept: 'pointer', conceptName: '포인터' }
 const array = { concept: 'array', conceptName: '배열' }
@@ -39,11 +39,16 @@ describe('diagnosisReason', () => {
     expect(text).toContain('‘동적 할당’부터 물어볼게요')
   })
 
-  it('맞히면 건너뛴 바탕 개념 수를 알려 준다', () => {
+  it('맞히면 바탕 개념은 더 묻지 않는다고 알려 준다 (개수는 세지 않음)', () => {
     const text = diagnosisReason({ prev: pointer, correct: true, next: recursion })
-    expect(text).toContain('‘포인터’ 정답!')
-    expect(text).toContain(`바탕 개념 ${ancestorsOf('pointer').size}개는 안다고 보고 건너뛰었어요`)
-    expect(text).toContain('‘재귀’를 확인할게요')
+    expect(text).toBe('‘포인터’ 정답! 그 바탕 개념은 안다고 보고 더 묻지 않아요. 이어서 ‘재귀’를 확인할게요.')
+    expect(text).not.toMatch(/\d+개/)
+  })
+
+  it('바탕 개념이 없는 개념을 맞히면 그 문장은 뺀다', () => {
+    const variable = { concept: 'variable', conceptName: '변수' }
+    const text = diagnosisReason({ prev: variable, correct: true, next: array })
+    expect(text).toBe('‘변수’ 정답! 이어서 ‘배열’을 확인할게요.')
   })
 
   it('틀리고 다음이 그 바탕 개념이면 내려간다고 알려 준다', () => {
@@ -54,6 +59,12 @@ describe('diagnosisReason', () => {
   it('틀렸지만 다음이 바탕 개념이 아니면 이어서 확인한다고만 한다', () => {
     const text = diagnosisReason({ prev: pointer, correct: false, next: recursion })
     expect(text).toBe('‘포인터’는 다시 볼 개념으로 표시했어요. 이어서 ‘재귀’를 확인할게요.')
+  })
+
+  it('안내 상자 색은 첫 문제 중립, 맞힘 파랑, 틀림 주황', () => {
+    expect(reasonTone(null)).toBe('neutral')
+    expect(reasonTone(true)).toBe('known')
+    expect(reasonTone(false)).toBe('gap')
   })
 
   it('진단이 끝났으면 문구가 없다', () => {

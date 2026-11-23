@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, getDiagnosisResult, setAuthToken } from '../api.ts'
 import { classifyDiagnosisError } from '../diagnosis/errors.ts'
-import { diagnosisReason } from '../diagnosis/reason.ts'
+import { diagnosisReason, reasonTone, type ReasonTone } from '../diagnosis/reason.ts'
 import { diagnosisSource, type DiagnosisStep } from '../diagnosis/source.ts'
 
 type Phase = 'intro' | 'question' | 'done'
@@ -31,7 +31,8 @@ export default function DiagnosisPage() {
   // 다시 시작하면 서버가 결과를 지우므로, 같이 쓰는 데모 계정에서 실수로 지우지 않게 한다.
   const [finished, setFinished] = useState<boolean | null>(null)
   // 지금 문제를 내는 이유 (직전 문제의 정답 여부와 선수 관계로 만든 한 줄)
-  const [reason, setReason] = useState<string | null>(null)
+  // 색은 직전 답에 맞춘다 (결과 그래프와 같은 약속: 파랑 = 아는 개념, 주황 = 보충할 개념)
+  const [reason, setReason] = useState<{ text: string; tone: ReasonTone } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -59,7 +60,9 @@ export default function DiagnosisPage() {
       // 시작이면 직전 문제가 없다. 답을 낸 경우엔 방금 푼 문제가 step에 남아 있다
       const prev = isStart ? null : (step?.question ?? null)
       const next = await load()
-      setReason(diagnosisReason({ prev, correct: isStart ? null : next.correct, next: next.question }))
+      const correct = isStart ? null : next.correct
+      const text = diagnosisReason({ prev, correct, next: next.question })
+      setReason(text ? { text, tone: reasonTone(correct) } : null)
       setStep(next)
       setSelected(null)
       setPhase(next.question ? 'question' : 'done')
@@ -171,8 +174,13 @@ export default function DiagnosisPage() {
       </div>
 
       {reason && (
-        <p className="diagnosis-reason" role="status">
-          {reason}
+        <p className={`diagnosis-reason ${reason.tone}`} role="status">
+          {reason.tone !== 'neutral' && (
+            <span className="diagnosis-reason-icon" aria-hidden="true">
+              {reason.tone === 'known' ? '✓' : '!'}
+            </span>
+          )}
+          <span>{reason.text}</span>
         </p>
       )}
 

@@ -183,10 +183,6 @@ export default function ResultPage() {
         개념 {graph.nodes.length}개 중 {weakCount}개를 보충하면 돼요. 위에서 아래로 선수 개념 → 목표 개념 순서예요.
         노드를 누르면 학습 블록으로 이동해요.
       </p>
-      <p className="concept-source-summary">
-        <strong>{diagnosedCount}개</strong>는 진단으로 확인했고(위 개념을 맞히면 그 바탕 개념도 함께 확인돼요), 나머지{' '}
-        <strong>{graph.nodes.length - diagnosedCount}개</strong>는 이수 성적과 공백 기간으로 추정했어요.
-      </p>
       <ul className="concept-legend">
         <li>
           <span className="swatch strong" aria-hidden="true">
@@ -197,6 +193,12 @@ export default function ResultPage() {
           <span className="swatch weak" aria-hidden="true">
             !
           </span> 보충할 개념 (60% 미만)
+        </li>
+        <li
+          className="concept-legend-source"
+          title="진단 확인: 진단 문제로 확인한 개념 (위 개념을 맞히면 그 바탕 개념도 함께 확인돼요). 추정: 이수 성적과 공백 기간으로 추정한 개념."
+        >
+          진단 확인 {diagnosedCount} · 추정 {graph.nodes.length - diagnosedCount}
         </li>
       </ul>
       {!graphWhole && (

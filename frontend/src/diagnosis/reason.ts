@@ -1,5 +1,6 @@
 // 진단 중에 "왜 이 문제를 내는지" 한 줄로 알려 주는 문구.
 // 엔진(백엔드)은 맞히면 그 개념의 선수 개념을 안다고 보고 건너뛰고, 틀리면 선수 개념을 먼저 묻는다.
+// 건너뛰는 개념 수는 엔진의 남은 후보(state.candidates)에 따라 달라서 화면에서는 세지 않는다.
 // 그 판단을 화면에서도 보이게 하려고, 직전 문제의 정답 여부와 다음 문제의 개념으로 문구를 만든다.
 // 선수 관계는 content/concepts.json에서 읽는다 (빌드할 때 번들에 들어감).
 import rawConcepts from '../../../content/concepts.json'
@@ -52,6 +53,14 @@ export interface ReasonInput {
   next: ReasonConcept | null
 }
 
+/** 안내 상자 색: 첫 문제는 중립, 맞히면 아는 개념(파랑), 틀리면 보충할 개념(주황) */
+export type ReasonTone = 'neutral' | 'known' | 'gap'
+
+export function reasonTone(correct: boolean | null): ReasonTone {
+  if (correct === null) return 'neutral'
+  return correct ? 'known' : 'gap'
+}
+
 /** 지금 문제를 내는 이유. 진단이 끝났으면 null */
 export function diagnosisReason({ prev, correct, next }: ReasonInput): string | null {
   if (!next) return null
@@ -63,7 +72,7 @@ export function diagnosisReason({ prev, correct, next }: ReasonInput): string | 
   const ancestors = ancestorsOf(prev.concept)
 
   if (correct) {
-    const skipped = ancestors.size > 0 ? ` 그 바탕 개념 ${ancestors.size}개는 안다고 보고 건너뛰었어요.` : ''
+    const skipped = ancestors.size > 0 ? ' 그 바탕 개념은 안다고 보고 더 묻지 않아요.' : ''
     return `${quote(prev.conceptName)} 정답!${skipped} 이어서 ${withEulReul(next.conceptName)} 확인할게요.`
   }
 
