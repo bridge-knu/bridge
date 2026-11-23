@@ -3,7 +3,7 @@
 //
 // 백엔드 진단 API(POST /diagnosis/start, /diagnosis/answer)를 부르고,
 // 응답(api.ts의 DiagnosisStep)을 아래의 화면용 형태로 바꿔서 돌려준다.
-// 채점과 다음 문제 선택은 백엔드가 한다. 정답 여부(correct)는 화면에 넘기지 않는다.
+// 채점과 다음 문제 선택은 백엔드가 한다. 직전 답의 정답 여부(correct)는 "왜 이 문제인지" 안내 문구에만 쓴다.
 // 아래 타입은 화면 내부용이며 API 규격이 아니다. API 규격은 api.ts에 있다.
 
 import {
@@ -18,6 +18,8 @@ export interface DiagnosisQuestion {
   id: string
   /** 개념 id (API의 conceptId) */
   concept: string
+  /** 개념 이름 (API의 conceptName) */
+  conceptName: string
   type: 'choice'
   prompt: string
   /** 코드 문제일 때만 있다 */
@@ -32,6 +34,8 @@ export interface DiagnosisStep {
   number: number
   /** 최대 문제 수 */
   total: number
+  /** 방금 낸 답의 정답 여부 (첫 문제면 null) */
+  correct: boolean | null
 }
 
 export interface DiagnosisSource {
@@ -44,6 +48,7 @@ function toQuestion(q: QuestionOut): DiagnosisQuestion {
   return {
     id: q.id,
     concept: q.conceptId,
+    conceptName: q.conceptName,
     type: 'choice',
     prompt: q.prompt,
     ...(q.code ? { code: q.code } : {}),
@@ -58,6 +63,7 @@ export function toStep(res: ApiDiagnosisStep): DiagnosisStep {
     question,
     number: question ? Math.min(res.answeredCount + 1, res.maxQuestions) : res.answeredCount,
     total: res.maxQuestions,
+    correct: res.correct,
   }
 }
 

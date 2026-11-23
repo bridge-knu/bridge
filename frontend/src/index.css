@@ -1508,3 +1508,58 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- 진단 이유·결과 출처 (엔진 판단을 화면에 보여 주기) ---- */
+
+/* 출제 이유: 첫 문제는 중립 카드(.plan-guide와 같은 모양), 맞힘은 파랑 ✓, 틀림은 주황 ! (결과 그래프 범례와 같은 약속) */
+.diagnosis-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 14px 18px 14px 22px;
+  border-radius: var(--radius-card);
+  background-color: var(--color-surface);
+  box-shadow: inset 4px 0 0 var(--color-ink);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--leading-body);
+}
+
+.diagnosis-reason.known {
+  background-color: var(--color-known-bg);
+  box-shadow: inset 4px 0 0 var(--color-known);
+  color: var(--color-known-ink);
+}
+
+.diagnosis-reason.gap {
+  background-color: var(--color-gap-bg);
+  box-shadow: inset 4px 0 0 var(--color-gap);
+  color: var(--color-gap-ink);
+}
+
+.diagnosis-reason-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.diagnosis-reason.gap .diagnosis-reason-icon {
+  border-style: dashed;
+}
+
+/* 범례 줄 끝의 진단 확인·추정 개수 */
+.concept-legend .concept-legend-source {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: help;
+}

@@ -35,7 +35,8 @@ function ConceptNodeView({ data }: NodeProps<ConceptNode>) {
       </strong>
       <span>
         <span className="visually-hidden">{data.weak ? '보충할 개념, ' : '아는 개념, '}</span>
-        {percent}%{data.blockId ? '' : ' · 블록 준비 중'}
+        {percent}% · {data.concept.source === 'diagnosed' ? '진단 확인' : '추정'}
+        {data.blockId ? '' : ' · 블록 준비 중'}
       </span>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </>
@@ -173,6 +174,7 @@ export default function ResultPage() {
   }
 
   const weakCount = graph.nodes.filter((n) => n.data.weak).length
+  const diagnosedCount = graph.nodes.filter((n) => n.data.concept.source === 'diagnosed').length
 
   return (
     <section>
@@ -191,6 +193,12 @@ export default function ResultPage() {
           <span className="swatch weak" aria-hidden="true">
             !
           </span> 보충할 개념 (60% 미만)
+        </li>
+        <li
+          className="concept-legend-source"
+          title="진단 확인: 진단 문제로 확인한 개념 (위 개념을 맞히면 그 바탕 개념도 함께 확인돼요). 추정: 이수 성적과 공백 기간으로 추정한 개념."
+        >
+          진단 확인 {diagnosedCount} · 추정 {graph.nodes.length - diagnosedCount}
         </li>
       </ul>
       {!graphWhole && (
