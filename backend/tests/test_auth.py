@@ -284,3 +284,56 @@ def test_docs_can_be_disabled(monkeypatch):
     assert "/docs" not in paths and "/openapi.json" not in paths
     monkeypatch.delenv("DISABLE_DOCS")
     importlib.reload(main)
+
+
+# ---- 체험 계정 ----
+
+
+def trial(client):
+    r = client.post("/auth/demo")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def auth_header(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_trial_makes_new_account_each_time(api_client, db):
+    first, second = trial(api_client), trial(api_client)
+    assert first["isNewUser"] is False
+    ids = db.scalars(select(User.login_id).where(User.login_id.like("demo-%"))).all()
+    assert len(ids) == 2 and all(len(i) == len("demo-") + 6 for i in ids)
+    assert first["token"] != second["token"]
+
+
+def test_trial_has_demo_result_and_plan(api_client, login):
+    token = trial(api_client)["token"]
+    result = api_client.get("/diagnosis/result", headers=auth_header(token))
+    assert result.status_code == 200
+    demo = api_client.get("/diagnosis/result", headers=auth_header(login("demo", "0000")))
+    assert result.json() == demo.json()
+    plan = api_client.get("/plan", headers=auth_header(token)).json()
+    assert plan["returnDate"] == "2027-03-02" and plan["dailyMinutes"] == 60
+    assert plan["days"]
+
+
+def test_trial_accounts_do_not_affect_each_other(api_client, login):
+    a, b = trial(api_client)["token"], trial(api_client)["token"]
+    assert api_client.post("/diagnosis/start", headers=auth_header(a)).status_code == 200
+    assert api_client.get("/diagnosis/result", headers=auth_header(a)).status_code == 400
+    assert api_client.get("/diagnosis/result", headers=auth_header(b)).status_code == 200
+    assert api_client.get("/diagnosis/result", headers=auth_header(login("demo", "0000"))).status_code == 200
+
+
+def test_trial_rate_limit_is_separate_from_signup(api_client, monkeypatch):
+    from app.api import auth
+
+    monkeypatch.setattr(auth, "SIGNUP_PER_IP", (1, 3600))
+    monkeypatch.setattr(auth, "TRIAL_PER_IP", (2, 3600))
+    assert post_login(api_client, "a1", "1234").status_code == 200
+    assert post_login(api_client, "a2", "1234").status_code == 429
+    assert api_client.post("/auth/demo").status_code == 200
+    assert api_client.post("/auth/demo").status_code == 200
+    r = api_client.post("/auth/demo")
+    assert r.status_code == 429 and r.json()["code"] == "TOO_MANY_REQUESTS"
