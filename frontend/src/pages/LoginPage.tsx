@@ -92,15 +92,17 @@ export default function LoginPage() {
         <h1>로그인</h1>
         <p className="login-hint">처음 쓰는 아이디면 자동으로 가입돼요.</p>
         <div className="login-demo">
+          <p className="login-demo-title">직접 해 보려면 체험하기</p>
           <p>
-            가입 없이 바로 둘러보려면 체험하기를 누르세요. 진단까지 끝난 나만의 체험 계정이 만들어져서, 진단을
-            다시 해 봐도 다른 사람에게 영향이 없어요.
+            진단까지 끝난 나만의 계정이 바로 만들어져요. 진단을 다시 하거나 프로필을 바꿔도 다른 사람에게 영향이
+            없어요.
           </p>
-          <button type="button" className="block-button secondary" onClick={handleTrial} disabled={busy}>
+          <button type="button" className="block-button" onClick={handleTrial} disabled={busy}>
             {trialLoading ? '체험 계정 만드는 중…' : '체험하기'}
           </button>
           <p className="login-demo-fallback">
-            공용 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>으로도 들어올 수 있어요.
+            둘러보기만 하려면 공용 데모 계정 <strong>demo</strong> / PIN <strong>0000</strong>도 돼요. 여러 명이
+            같이 쓰는 계정이라 진단·프로필은 바꿀 수 없어요.
           </p>
         </div>
 

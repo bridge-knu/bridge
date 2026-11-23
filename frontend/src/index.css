@@ -446,6 +446,13 @@ select {
   margin: var(--space-3) 0;
 }
 
+.login-demo .login-demo-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-md);
+  font-weight: 800;
+  color: var(--color-ink);
+}
+
 .login-demo-fallback {
   color: var(--color-ink-soft);
 }
