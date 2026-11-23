@@ -217,6 +217,48 @@ describe('toPlanView: 미룬 개념', () => {
   })
 })
 
+describe('toPlanView: 같은 개념 블록 번호', () => {
+  const b = (blockId: string, conceptId: string, order: number): PlanBlock => ({
+    order,
+    blockId,
+    conceptId,
+    conceptName: conceptId,
+    minutes: 30,
+    done: false,
+  })
+
+  it('여러 블록으로 나뉜 개념만 날짜·순서대로 1/N을 붙인다', () => {
+    const view = toPlanView(
+      plan({
+        today: '2026-11-23',
+        days: [
+          // 일부러 날짜를 뒤섞어 둔다 (번호는 날짜순)
+          { date: '2026-11-24', blocks: [b('p2', 'pointer', 1), b('s1', 'stack', 2)] },
+          { date: '2026-11-23', blocks: [b('r1', 'recursion', 1), b('p1', 'pointer', 2)] },
+        ],
+      }),
+    )
+    expect(view.parts.get('p1')).toEqual({ index: 1, total: 2 })
+    expect(view.parts.get('p2')).toEqual({ index: 2, total: 2 })
+    expect(view.parts.has('r1')).toBe(false)
+    expect(view.parts.has('s1')).toBe(false)
+  })
+
+  it('lastDate는 블록이 있는 마지막 날짜', () => {
+    const view = toPlanView(
+      plan({
+        today: '2026-11-23',
+        days: [
+          { date: '2026-11-25', blocks: [] },
+          { date: '2026-11-24', blocks: [b('a', 'a', 1)] },
+        ],
+      }),
+    )
+    expect(view.lastDate).toBe('2026-11-24')
+    expect(toPlanView(plan({ days: [] })).lastDate).toBeNull()
+  })
+})
+
 describe('날짜', () => {
   it('localToday는 로컬 날짜 YYYY-MM-DD', () => {
     expect(localToday(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')

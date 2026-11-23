@@ -38,11 +38,19 @@ function DayCard({ day, view }: { day: PlanDayView; view: PlanView }) {
         {day.blocks.map((b) => {
           const reachable = view.reachableToday.has(b.blockId)
           const last = view.today.kind === 'remaining' && view.today.lastBlockId === b.blockId
+          const part = view.parts.get(b.blockId)
           const cls = ['plan-block', b.done ? 'done' : '', reachable ? 'reachable' : ''].filter(Boolean).join(' ')
           return (
             <li key={b.blockId}>
               <Link to={`/blocks/${encodeURIComponent(b.blockId)}`} className={cls}>
-                <span className="plan-block-name">{b.conceptName}</span>
+                <span className="plan-block-name">
+                  {b.conceptName}
+                  {part && (
+                    <span className="plan-block-part">
+                      {part.index}/{part.total}
+                    </span>
+                  )}
+                </span>
                 <span className="plan-block-meta">
                   {b.minutes}분
                   {b.done && <span className="plan-badge done">완료</span>}
@@ -118,6 +126,8 @@ export default function PlanPage() {
     () => (state.status === 'ready' ? toPlanView(state.plan) : null),
     [state],
   )
+  // 마지막 학습일부터 복학일까지 남는 날. 이틀 이상이면 다리 끝을 점선으로 그리고 알려 준다
+  const gapDays = view?.lastDate ? daysUntil(view.lastDate, view.returnDate) : 0
 
   if (state.status === 'loading') {
     return (
@@ -204,6 +214,11 @@ export default function PlanPage() {
         {view.days.map((day) => (
           <DayCard key={day.date} day={day} view={view} />
         ))}
+        {view.lastDate && gapDays > 1 && (
+          <p className="plan-gap">
+            {formatDate(view.lastDate)}에 플랜이 끝나요. 복학까지 {gapDays}일이 더 남아요.
+          </p>
+        )}
         <p className="plan-end">
           <span className="plan-end-label">복학일</span>
           {formatDate(view.returnDate)}

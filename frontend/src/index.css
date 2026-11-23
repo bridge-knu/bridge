@@ -20,6 +20,9 @@
 body {
   margin: 0;
   font-size: var(--text-md);
+  /* Pretendard는 "->"를 화살표 한 글자로 합쳐 그린다. C 코드(ptr->age)가 틀리게 보이므로 합자를 끈다 */
+  font-variant-ligatures: none;
+  font-feature-settings: 'calt' 0, 'liga' 0;
 }
 
 /* 버튼·입력칸도 Pretendard를 물려받게 (브라우저 기본은 Arial) */
@@ -864,6 +867,14 @@ select {
   font-weight: 700;
 }
 
+.plan-block-part {
+  margin-left: var(--space-2);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .plan-block-meta {
   display: flex;
   flex-wrap: wrap;
@@ -903,6 +914,35 @@ select {
 .plan-badge.until {
   background-color: var(--color-highlight);
   color: var(--color-ink);
+}
+
+/* 마지막 학습일 ~ 복학일 사이: 다리를 점선으로 */
+.plan-gap {
+  position: relative;
+  margin: 0;
+  padding: var(--space-4) 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* 실선을 바탕색으로 덮고(::before) 그 위에 점선(::after)을 그린다. 위아래 카드 사이 간격까지 덮는다 */
+.plan-gap::before,
+.plan-gap::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--space-4));
+  bottom: calc(-1 * var(--space-4));
+  left: calc(var(--rail-x) - var(--rail-pad) - var(--rail-width) / 2);
+  width: var(--rail-width);
+}
+
+.plan-gap::before {
+  background-color: var(--color-paper);
+}
+
+.plan-gap::after {
+  width: 0;
+  border-left: var(--rail-width) dashed var(--color-ink-faint);
 }
 
 /* 다리의 끝: 복학일 */
